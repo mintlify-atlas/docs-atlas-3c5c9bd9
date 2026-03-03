@@ -1,0 +1,193 @@
+{
+  "projectType": "api-service",
+  "projectName": "MCRIT",
+  "projectDescription": "MinHash-based Code Relationship & Investigation Toolkit for code similarity analysis using disassembly reports.",
+  "theme": "aspen",
+  "primaryColor": "#4A90E2",
+  "lightColor": "#7AB8F5",
+  "darkColor": "#2E5A8E",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/minhash",
+              "concepts/shinglers",
+              "concepts/pichash",
+              "concepts/architecture"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/deployment",
+              "guides/docker",
+              "guides/client-usage",
+              "guides/cli-usage",
+              "guides/ida-plugin",
+              "guides/reference-data"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/server",
+              "configuration/storage",
+              "configuration/minhash",
+              "configuration/queue"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "API Overview",
+            "pages": [
+              "api/overview",
+              "api/authentication"
+            ]
+          },
+          {
+            "group": "Endpoints",
+            "pages": [
+              "api/status",
+              "api/samples",
+              "api/families",
+              "api/functions",
+              "api/matching",
+              "api/query",
+              "api/jobs",
+              "api/blocks"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Python Client",
+        "groups": [
+          {
+            "group": "Client SDK",
+            "pages": [
+              "client/overview",
+              "client/installation",
+              "client/authentication"
+            ]
+          },
+          {
+            "group": "Client Methods",
+            "pages": [
+              "client/samples",
+              "client/families",
+              "client/functions",
+              "client/matching",
+              "client/query",
+              "client/jobs",
+              "client/export-import"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "MinHash-based code similarity analysis",
+    "REST API for code relationship investigation",
+    "Support for disassembly reports from SMDA",
+    "Persistent MongoDB storage backend",
+    "Async job queue with worker system",
+    "PicHash and PicBlockHash matching",
+    "Python client SDK for programmatic access",
+    "CLI tool for command-line operations",
+    "IDA Pro plugin integration",
+    "Cross-sample and family matching",
+    "Function-level code comparison",
+    "Unique block identification",
+    "Advanced search syntax",
+    "Export/Import functionality"
+  ],
+  "publicApiSurface": [
+    "GET /status - System status and statistics",
+    "GET /version - MCRIT version",
+    "GET /config - Server configuration",
+    "POST /respawn - Reset and initialize storage",
+    "GET /export - Export all data",
+    "GET /export/{sample_ids} - Export specific samples",
+    "POST /import - Import MCRIT data",
+    "GET /complete_minhashes - Schedule minhash calculation",
+    "GET /rebuild_index - Rebuild MinHash index",
+    "GET /recalculate_pichashes - Recalculate PicHashes",
+    "GET /recalculate_minhashes - Recalculate MinHashes",
+    "GET /search/families - Search families",
+    "GET /search/samples - Search samples",
+    "GET /search/functions - Search functions",
+    "GET /families - List all families",
+    "GET /families/{family_id} - Get family details",
+    "PUT /families/{family_id} - Update family",
+    "DELETE /families/{family_id} - Delete family",
+    "GET /samples - List all samples",
+    "POST /samples - Submit new sample",
+    "POST /samples/binary - Submit binary file",
+    "GET /samples/{sample_id} - Get sample details",
+    "PUT /samples/{sample_id} - Update sample",
+    "DELETE /samples/{sample_id} - Delete sample",
+    "GET /samples/sha256/{sha256} - Get sample by SHA256",
+    "GET /samples/{sample_id}/functions - Get sample functions",
+    "GET /samples/{sample_id}/functions/{function_id} - Get specific function",
+    "GET /functions - List all functions",
+    "GET /functions/{function_id} - Get function details",
+    "GET /matches/sample/{sample_id} - Match sample",
+    "GET /matches/sample/cross/{sample_ids} - Cross-match samples",
+    "GET /matches/sample/{sample_id}/{sample_id_b} - Compare two samples",
+    "GET /matches/function/{function_id}/{function_id_b} - Compare two functions",
+    "GET /matches/function/{function_id} - Match function",
+    "GET /uniqueblocks/samples/{sample_ids} - Find unique blocks",
+    "GET /uniqueblocks/family/{family_id} - Find unique blocks for family",
+    "POST /query - Query with SMDA report",
+    "POST /query/binary - Query with binary",
+    "POST /query/binary/mapped/{base_address} - Query mapped binary",
+    "POST /query/function - Query single function",
+    "GET /query/pichash/{pichash} - Query by PicHash",
+    "GET /query/pichash/{pichash}/summary - PicHash summary",
+    "GET /query/picblockhash/{picblockhash} - Query by PicBlockHash",
+    "GET /query/picblockhash/{picblockhash}/summary - PicBlockHash summary",
+    "GET /jobs - List all jobs",
+    "GET /jobs/stats - Job statistics",
+    "GET /jobs/{job_id} - Get job details",
+    "DELETE /jobs/{job_id} - Delete job",
+    "GET /jobs/{job_id}/result - Get job result",
+    "GET /results/{result_id} - Get result details",
+    "GET /results/{result_id}/job - Get result's job",
+    "McritClient - Python client class",
+    "McritClient.getStatus() - Get system status",
+    "McritClient.addReport() - Add SMDA report",
+    "McritClient.addBinarySample() - Add binary sample",
+    "McritClient.getSamples() - Get all samples",
+    "McritClient.getSampleById() - Get sample by ID",
+    "McritClient.deleteSample() - Delete sample",
+    "McritClient.getFamilies() - Get all families",
+    "McritClient.getFunctionsBySampleId() - Get functions by sample",
+    "McritClient.getMatchesForSampleId() - Get matches for sample",
+    "McritClient.getMatchesForUnmappedBinary() - Match binary",
+    "McritClient.getMatchesForMappedBinary() - Match mapped binary",
+    "McritClient.getMatchesForSmdaReport() - Match SMDA report",
+    "McritClient.getMatchesForSmdaFunction() - Match function",
+    "McritClient.awaitResult() - Wait for job result",
+    "McritClient.getJob() - Get job status",
+    "McritClient.getJobResult() - Get job result",
+    "McritClient.exportData() - Export MCRIT data",
+    "McritClient.importData() - Import MCRIT data"
+  ]
+}
