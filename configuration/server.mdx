@@ -1,0 +1,105 @@
+---
+title: "Server Configuration"
+description: "Configure MCRIT server and WSGI options"
+---
+
+## Overview
+
+MCRIT server configuration controls authentication, logging, and WSGI server behavior. The main configuration is defined in `McritConfig` and can be extended with Gunicorn-specific options.
+
+## Authentication
+
+<ParamField path="AUTH_TOKEN" type="string" default='""'>
+  Optional authentication token to lock down communication with the API. When set, all API requests must include this token for authorization. Leave empty to disable authentication.
+</ParamField>
+
+## Logging Configuration
+
+<ParamField path="LOG_PATH" type="string" default='./'>
+  Directory path where log files will be written. Defaults to the current working directory.
+</ParamField>
+
+<ParamField path="LOG_LEVEL" type="logging level" default="logging.INFO">
+  Python logging level for controlling verbosity. Common values:
+  - `logging.DEBUG` - Detailed diagnostic information
+  - `logging.INFO` - General informational messages (default)
+  - `logging.WARNING` - Warning messages
+  - `logging.ERROR` - Error messages only
+</ParamField>
+
+<ParamField path="LOG_FORMAT" type="string" default='%(asctime)-15s: %(name)-32s - %(message)s'>
+  Format string for log messages following Python logging format conventions. Includes timestamp, logger name, and message by default.
+</ParamField>
+
+## WSGI Server Options
+
+MCRIT can run with either Waitress (default) or Gunicorn as the WSGI server.
+
+### Gunicorn Configuration
+
+<ParamField path="USE_GUNICORN" type="bool" default="False">
+  Enable Gunicorn as the WSGI server instead of Waitress. Set to `True` to use Gunicorn with the configuration options below.
+</ParamField>
+
+<ParamField path="BIND" type="string" default='0.0.0.0:8000'>
+  Host and port binding for the Gunicorn server. Format: `"<host>:<port>"`
+  
+  Examples:
+  - `"0.0.0.0:8000"` - Listen on all interfaces, port 8000 (default)
+  - `"127.0.0.1:5000"` - Listen only on localhost, port 5000
+  - `"192.168.1.100:8080"` - Listen on specific IP, port 8080
+</ParamField>
+
+<ParamField path="WORKERS" type="int" default="4">
+  Number of worker processes Gunicorn will spawn. Each worker handles requests independently.
+  
+  Recommended value: `(2 × number_of_cores) + 1`
+</ParamField>
+
+<ParamField path="THREADS" type="int" default="8">
+  Number of threads per worker process. Total concurrent request capacity is `WORKERS × THREADS`.
+</ParamField>
+
+<ParamField path="TIMEOUT" type="int" default="120">
+  Timeout in seconds before silent workers are killed and restarted. Increase this value if you have long-running operations.
+</ParamField>
+
+## Example Configuration
+
+### Waitress (Default)
+
+```python
+from mcrit.config.McritConfig import McritConfig
+
+config = McritConfig()
+config.AUTH_TOKEN = "your-secret-token"
+config.LOG_LEVEL = logging.DEBUG
+```
+
+### Gunicorn
+
+```python
+from mcrit.config.McritConfig import McritConfig
+from mcrit.config.GunicornConfig import GunicornConfig
+
+config = McritConfig()
+config.AUTH_TOKEN = "your-secret-token"
+
+gunicorn_config = GunicornConfig(
+    USE_GUNICORN=True,
+    BIND="0.0.0.0:8000",
+    WORKERS=8,
+    THREADS=16,
+    TIMEOUT=300
+)
+```
+
+## Version Information
+
+The current MCRIT version is defined in `McritConfig.VERSION` (currently `1.4.5`).
+
+## Related Configuration
+
+- [Storage Configuration](/configuration/storage) - MongoDB and database settings
+- [MinHash Configuration](/configuration/minhash) - MinHash algorithm parameters
+- [Queue Configuration](/configuration/queue) - Job queue and worker settings

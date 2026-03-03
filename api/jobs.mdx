@@ -1,0 +1,395 @@
+---
+title: 'Jobs'
+description: 'Track asynchronous job processing'
+---
+
+## Overview
+
+Jobs represent asynchronous operations such as binary analysis, matching, and query processing. The job system allows you to submit tasks and track their progress.
+
+---
+
+## Job States
+
+Jobs progress through the following states:
+
+- **queued**: Job is waiting to be processed
+- **processing**: Job is currently being executed
+- **finished**: Job completed successfully
+- **failed**: Job encountered an error
+
+---
+
+## List Jobs
+
+<ParamField query="start" type="integer" default="0">
+  Starting job ID for pagination
+</ParamField>
+
+<ParamField query="limit" type="integer" default="0">
+  Maximum number of jobs to return (0 = no limit)
+</ParamField>
+
+<ParamField query="method" type="string">
+  Filter by job method (e.g., "addBinarySample", "getMatches")
+</ParamField>
+
+<ParamField query="state" type="string">
+  Filter by job state (queued, processing, finished, failed)
+</ParamField>
+
+<ParamField query="filter" type="string">
+  Search filter for job metadata
+</ParamField>
+
+<ParamField query="ascending" type="boolean" default="false">
+  Sort by creation time in ascending order (newest first by default)
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://your-mcrit-instance/jobs?state=finished&limit=50&ascending=false"
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "65f9a3b2c1d8e4f7a0b9c2d1": {
+      "job_id": "65f9a3b2c1d8e4f7a0b9c2d1",
+      "method": "addBinarySample",
+      "state": "finished",
+      "created": "2024-01-15T10:30:00",
+      "started": "2024-01-15T10:30:02",
+      "finished": "2024-01-15T10:30:45",
+      "duration": 43.2,
+      "parameters": {
+        "filename": "sample.exe",
+        "sha256": "abc123..."
+      },
+      "result_id": "65f9a3b2c1d8e4f7a0b9c2d2"
+    },
+    "65f9a3b2c1d8e4f7a0b9c2d3": {...}
+  }
+}
+```
+</ResponseExample>
+
+Returns a dictionary of jobs keyed by job ID (24-character hex strings).
+
+---
+
+## Get Job Statistics
+
+<ParamField query="with_refresh" type="boolean" default="false">
+  Refresh statistics by scanning the job queue
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://your-mcrit-instance/jobs/stats?with_refresh=true"
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "total_jobs": 1234,
+    "queued": 5,
+    "processing": 2,
+    "finished": 1200,
+    "failed": 27,
+    "by_method": {
+      "addBinarySample": 456,
+      "getMatchesForSample": 678,
+      "getMatchesForBinary": 100
+    },
+    "avg_duration": 34.5
+  }
+}
+```
+</ResponseExample>
+
+Returns aggregate statistics about the job queue.
+
+---
+
+## Get Job
+
+<ParamField path="job_id" type="string" required>
+  24-character hexadecimal job ID
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET https://your-mcrit-instance/jobs/65f9a3b2c1d8e4f7a0b9c2d1
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "job_id": "65f9a3b2c1d8e4f7a0b9c2d1",
+    "method": "addBinarySample",
+    "state": "finished",
+    "created": "2024-01-15T10:30:00",
+    "started": "2024-01-15T10:30:02",
+    "finished": "2024-01-15T10:30:45",
+    "duration": 43.2,
+    "parameters": {
+      "filename": "sample.exe",
+      "sha256": "abc123...",
+      "family": "malware_family",
+      "bitness": 32
+    },
+    "result_id": "65f9a3b2c1d8e4f7a0b9c2d2",
+    "error": null
+  }
+}
+```
+</ResponseExample>
+
+Retrieve detailed information about a specific job.
+
+<ResponseField name="job_id" type="string">
+  Unique 24-character hexadecimal job identifier
+</ResponseField>
+
+<ResponseField name="method" type="string">
+  Job method/operation type
+</ResponseField>
+
+<ResponseField name="state" type="string">
+  Current job state (queued, processing, finished, failed)
+</ResponseField>
+
+<ResponseField name="created" type="string">
+  ISO 8601 timestamp when job was created
+</ResponseField>
+
+<ResponseField name="started" type="string">
+  ISO 8601 timestamp when processing started
+</ResponseField>
+
+<ResponseField name="finished" type="string">
+  ISO 8601 timestamp when job completed
+</ResponseField>
+
+<ResponseField name="duration" type="float">
+  Execution time in seconds
+</ResponseField>
+
+<ResponseField name="result_id" type="string">
+  Result ID if job produced a result
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Error message if job failed
+</ResponseField>
+
+---
+
+## Delete Job
+
+<ParamField path="job_id" type="string" required>
+  24-character hexadecimal job ID
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X DELETE https://your-mcrit-instance/jobs/65f9a3b2c1d8e4f7a0b9c2d1
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "num_deleted": 1
+  }
+}
+```
+</ResponseExample>
+
+Delete a specific job and its associated result.
+
+---
+
+## Delete Jobs (Bulk)
+
+<ParamField query="method" type="string">
+  Filter by job method
+</ParamField>
+
+<ParamField query="created_before" type="string">
+  Delete jobs created before this date (format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)
+</ParamField>
+
+<ParamField query="finished_before" type="string">
+  Delete jobs finished before this date (format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)
+</ParamField>
+
+<RequestExample>
+```bash cURL
+# Delete all finished jobs from before 2024
+curl -X DELETE "https://your-mcrit-instance/jobs?finished_before=2024-01-01"
+
+# Delete specific job type created before date
+curl -X DELETE "https://your-mcrit-instance/jobs?method=addBinarySample&created_before=2024-01-01T00:00:00"
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "num_deleted": 342
+  }
+}
+```
+</ResponseExample>
+
+Delete multiple jobs matching the specified criteria. All filter parameters are combined with AND logic.
+
+<Warning>Bulk deletion is permanent and cannot be undone. Use with caution.</Warning>
+
+---
+
+## Get Job Result
+
+<ParamField path="job_id" type="string" required>
+  24-character hexadecimal job ID
+</ParamField>
+
+<ParamField query="compact" type="boolean" default="false">
+  Return compact format (omit function-level match details)
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://your-mcrit-instance/jobs/65f9a3b2c1d8e4f7a0b9c2d1/result?compact=false"
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "sample_id": 125,
+    "sha256": "abc123...",
+    "function_count": 98,
+    "matches": {
+      "samples": {...},
+      "functions": {...}
+    },
+    "processing_time": 43.2
+  }
+}
+```
+</ResponseExample>
+
+Retrieve the result data for a completed job. Only available for jobs in the "finished" state.
+
+<Note>When `compact=true`, function-level match details are omitted from matching/query job results, significantly reducing response size for large result sets.</Note>
+
+---
+
+## Get Result
+
+<ParamField path="result_id" type="string" required>
+  24-character hexadecimal result ID
+</ParamField>
+
+<ParamField query="compact" type="boolean" default="false">
+  Return compact format
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET https://your-mcrit-instance/results/65f9a3b2c1d8e4f7a0b9c2d2
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "sample_id": 125,
+    "sha256": "abc123...",
+    "function_count": 98,
+    "matches": {...}
+  }
+}
+```
+</ResponseExample>
+
+Retrieve result data directly by result ID.
+
+---
+
+## Get Result's Job
+
+<ParamField path="result_id" type="string" required>
+  24-character hexadecimal result ID
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET https://your-mcrit-instance/results/65f9a3b2c1d8e4f7a0b9c2d2/job
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "job_id": "65f9a3b2c1d8e4f7a0b9c2d1",
+    "method": "addBinarySample",
+    "state": "finished",
+    "created": "2024-01-15T10:30:00",
+    "duration": 43.2
+  }
+}
+```
+</ResponseExample>
+
+Retrieve the job information associated with a result ID.
+
+---
+
+## Job Lifecycle
+
+<Steps>
+  <Step title="Job Creation">
+    When you submit a binary or initiate a matching operation, a job is created and returned to you with a job ID
+  </Step>
+  
+  <Step title="Queueing">
+    The job enters the queue with state "queued" and waits for a worker to become available
+  </Step>
+  
+  <Step title="Processing">
+    A worker picks up the job, changes state to "processing", and executes the operation
+  </Step>
+  
+  <Step title="Completion">
+    Job finishes with state "finished" (success) or "failed" (error), and result data is stored
+  </Step>
+  
+  <Step title="Result Retrieval">
+    Use the job ID or result ID to retrieve the output data
+  </Step>
+</Steps>
+
+<Info>Long-running operations (like binary analysis and large-scale matching) are processed asynchronously. Poll the job status or implement webhooks to track completion.</Info>

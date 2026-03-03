@@ -1,0 +1,280 @@
+---
+title: 'Matching'
+description: 'Compare samples and functions for similarity'
+---
+
+## Overview
+
+Matching endpoints perform similarity analysis between samples and functions using MinHash-based locality-sensitive hashing (LSH). These operations identify code reuse and similarities.
+
+---
+
+## Matching Parameters
+
+The following query parameters are supported by all matching endpoints:
+
+<ParamField query="minhash_score" type="integer" default="50">
+  Minimum MinHash similarity score (0-100). Higher values require more similarity.
+</ParamField>
+
+<ParamField query="band_matches_required" type="integer">
+  Minimum number of LSH band matches required for candidates
+</ParamField>
+
+<ParamField query="pichash_size" type="integer">
+  Size threshold for PicHash matching
+</ParamField>
+
+<ParamField query="force_recalculation" type="boolean" default="false">
+  Force recalculation of matches instead of using cached results
+</ParamField>
+
+<ParamField query="sample_group_only" type="boolean" default="false">
+  Limit matches to samples within the same family group
+</ParamField>
+
+---
+
+## Get Sample Matches
+
+<ParamField path="sample_id" type="integer" required>
+  Sample ID to find matches for
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://your-mcrit-instance/matches/sample/123?minhash_score=70&band_matches_required=5"
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "sample_id": 123,
+    "matches": {
+      "124": {
+        "sample_id": 124,
+        "sha256": "def789...",
+        "family": "related_family",
+        "matched_functions": 42,
+        "matched_bytes": 15360,
+        "match_score": 0.87,
+        "function_matches": {
+          "9876": {
+            "function_id_a": 9876,
+            "function_id_b": 8765,
+            "minhash_score": 0.92,
+            "matched_instructions": 145
+          }
+        }
+      }
+    },
+    "total_matches": 8
+  }
+}
+```
+</ResponseExample>
+
+Finds all samples in the database that match the specified sample based on function similarity.
+
+---
+
+## Get Cross Matches
+
+<ParamField path="sample_ids" type="string" required>
+  Comma-separated list of sample IDs to cross-match
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://your-mcrit-instance/matches/sample/cross/123,124,125?minhash_score=60"
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "cross_matches": {
+      "123_124": {
+        "sample_id_a": 123,
+        "sample_id_b": 124,
+        "matched_functions": 35,
+        "match_score": 0.78
+      },
+      "123_125": {
+        "sample_id_a": 123,
+        "sample_id_b": 125,
+        "matched_functions": 28,
+        "match_score": 0.65
+      },
+      "124_125": {...}
+    }
+  }
+}
+```
+</ResponseExample>
+
+Performs pairwise matching between all specified samples. Useful for clustering analysis and identifying relationships within a sample set.
+
+---
+
+## Get Sample vs Sample Matches
+
+<ParamField path="sample_id" type="integer" required>
+  First sample ID
+</ParamField>
+
+<ParamField path="sample_id_b" type="integer" required>
+  Second sample ID
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://your-mcrit-instance/matches/sample/123/vs/124?minhash_score=70"
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "sample_id_a": 123,
+    "sample_id_b": 124,
+    "sha256_a": "abc123...",
+    "sha256_b": "def456...",
+    "matched_functions": 42,
+    "matched_bytes": 15360,
+    "match_score": 0.87,
+    "function_matches": {
+      "9876_8765": {
+        "function_id_a": 9876,
+        "function_id_b": 8765,
+        "function_name_a": "decode_payload",
+        "function_name_b": "decrypt_data",
+        "minhash_score": 0.92,
+        "matched_instructions": 145,
+        "num_instructions_a": 156,
+        "num_instructions_b": 160
+      }
+    }
+  }
+}
+```
+</ResponseExample>
+
+Performs detailed matching between two specific samples, returning function-level match information.
+
+---
+
+## Get Function Matches
+
+<ParamField path="function_id" type="integer" required>
+  Function ID to find matches for
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET https://your-mcrit-instance/matches/function/9876
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "not_implemented"
+}
+```
+</ResponseExample>
+
+<Warning>This endpoint is currently not implemented and returns HTTP 501.</Warning>
+
+---
+
+## Get Function vs Function Match
+
+<ParamField path="function_id" type="integer" required>
+  First function ID
+</ParamField>
+
+<ParamField path="function_id_b" type="integer" required>
+  Second function ID
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET https://your-mcrit-instance/matches/function/9876/vs/8765
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "function_id_a": 9876,
+    "function_id_b": 8765,
+    "sample_id_a": 123,
+    "sample_id_b": 124,
+    "function_name_a": "decode_payload",
+    "function_name_b": "decrypt_data",
+    "offset_a": 4096,
+    "offset_b": 8192,
+    "minhash_score": 0.92,
+    "pichash_match": true,
+    "num_instructions_a": 156,
+    "num_instructions_b": 160,
+    "num_blocks_a": 23,
+    "num_blocks_b": 24,
+    "matched_instructions": 145,
+    "instruction_coverage_a": 0.93,
+    "instruction_coverage_b": 0.91
+  }
+}
+```
+</ResponseExample>
+
+Performs detailed similarity comparison between two specific functions.
+
+<ResponseField name="minhash_score" type="float">
+  MinHash Jaccard similarity score (0.0-1.0)
+</ResponseField>
+
+<ResponseField name="pichash_match" type="boolean">
+  Whether the PicHash values match exactly
+</ResponseField>
+
+<ResponseField name="matched_instructions" type="integer">
+  Number of semantically matched instructions
+</ResponseField>
+
+<ResponseField name="instruction_coverage_a" type="float">
+  Percentage of function A's instructions matched (0.0-1.0)
+</ResponseField>
+
+---
+
+## Understanding Matching Parameters
+
+<Accordion title="MinHash Score Threshold">
+  The `minhash_score` parameter (0-100) controls the minimum similarity required for a match. 
+  
+  - **70-100**: Very high similarity, likely code clones or minor variants
+  - **50-70**: Moderate similarity, related functions with some differences
+  - **30-50**: Low similarity, possibly shared code patterns
+  - **0-30**: Minimal similarity, mostly different code
+</Accordion>
+
+<Accordion title="Band Matches Required">
+  The `band_matches_required` parameter controls LSH sensitivity. Higher values reduce false positives but may miss some matches. 
+  
+  LSH divides MinHash signatures into bands. Functions matching in multiple bands are candidate pairs for detailed comparison.
+</Accordion>
+
+<Accordion title="Sample Group Only">
+  When `sample_group_only=true`, matching is restricted to samples within the same family. This is useful for variant analysis within a malware family.
+</Accordion>

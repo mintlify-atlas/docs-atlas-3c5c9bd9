@@ -1,0 +1,183 @@
+---
+title: 'Functions'
+description: 'Query function information'
+---
+
+## Overview
+
+Function endpoints provide access to individual function data including disassembly information, MinHash signatures, PicHash values, and cross-reference graphs.
+
+---
+
+## List Functions
+
+<ParamField query="start" type="integer" default="0">
+  Starting index for pagination
+</ParamField>
+
+<ParamField query="limit" type="integer" default="0">
+  Maximum number of functions to return (0 = no limit)
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://your-mcrit-instance/functions?start=0&limit=100"
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "9876": {
+      "function_id": 9876,
+      "sample_id": 123,
+      "offset": 4096,
+      "function_name": "decode_payload",
+      "num_instructions": 156,
+      "num_blocks": 23,
+      "pichash": "a1b2c3d4e5f6a7b8",
+      "minhash": [123, 456, 789, ...],
+      "function_labels": ["crypto"],
+      "binweight": 0.72
+    },
+    "9877": {...}
+  }
+}
+```
+</ResponseExample>
+
+Returns a dictionary of functions keyed by function ID.
+
+---
+
+## Get Function
+
+<ParamField path="function_id" type="integer" required>
+  Unique identifier of the function
+</ParamField>
+
+<ParamField query="with_xcfg" type="boolean" default="false">
+  Include cross-reference control flow graph data
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://your-mcrit-instance/functions/9876?with_xcfg=true"
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "function_id": 9876,
+    "sample_id": 123,
+    "offset": 4096,
+    "function_name": "decode_payload",
+    "num_instructions": 156,
+    "num_blocks": 23,
+    "num_edges": 45,
+    "pichash": "a1b2c3d4e5f6a7b8",
+    "minhash": [123, 456, 789, ...],
+    "minhash_shingle_composition": {...},
+    "function_labels": ["crypto", "decryption"],
+    "binweight": 0.72,
+    "xcfg": {
+      "blocks": [...],
+      "edges": [...],
+      "calls": [...]
+    }
+  }
+}
+```
+</ResponseExample>
+
+<ResponseField name="function_id" type="integer">
+  Unique identifier for the function
+</ResponseField>
+
+<ResponseField name="sample_id" type="integer">
+  ID of the sample this function belongs to
+</ResponseField>
+
+<ResponseField name="offset" type="integer">
+  Virtual address offset of the function entry point
+</ResponseField>
+
+<ResponseField name="function_name" type="string">
+  Name or label of the function
+</ResponseField>
+
+<ResponseField name="num_instructions" type="integer">
+  Total number of instructions in the function
+</ResponseField>
+
+<ResponseField name="num_blocks" type="integer">
+  Number of basic blocks
+</ResponseField>
+
+<ResponseField name="pichash" type="string">
+  Position-independent code hash (16-character hex)
+</ResponseField>
+
+<ResponseField name="minhash" type="array">
+  MinHash signature array for similarity matching
+</ResponseField>
+
+<ResponseField name="function_labels" type="array">
+  Array of labels/tags for this function
+</ResponseField>
+
+<ResponseField name="binweight" type="float">
+  Binary weight score
+</ResponseField>
+
+<ResponseField name="xcfg" type="object">
+  Cross-reference control flow graph (only included when with_xcfg=true)
+</ResponseField>
+
+Returns 404 if the function ID doesn't exist.
+
+---
+
+## Get Functions by IDs
+
+<ParamField query="with_label_only" type="boolean" default="false">
+  Only return functions that have labels
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X POST "https://your-mcrit-instance/functions?with_label_only=true" \
+  -H "Content-Type: text/plain" \
+  -d "9876,9877,9878,9879"
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "9876": {
+      "function_id": 9876,
+      "sample_id": 123,
+      "offset": 4096,
+      "function_name": "decode_payload",
+      "num_instructions": 156,
+      "num_blocks": 23,
+      "pichash": "a1b2c3d4e5f6a7b8",
+      "function_labels": ["crypto"]
+    },
+    "9878": {...}
+  }
+}
+```
+</ResponseExample>
+
+Retrieves multiple functions by their IDs. The request body should contain a comma-separated list of function IDs.
+
+<Note>When `with_label_only=true`, only functions with at least one label are returned. This is useful for filtering to labeled/annotated functions.</Note>

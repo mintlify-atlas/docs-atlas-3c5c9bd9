@@ -1,97 +1,112 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: Introduction
+description: MinHash-based Code Relationship & Investigation Toolkit for code similarity analysis
 ---
 
-## Setting up
+<Note>
+MCRIT is a framework created to simplify the application of the MinHash algorithm in the context of code similarity.
+</Note>
 
-Get your documentation site up and running in minutes.
+## What is MCRIT?
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+MCRIT (MinHash-based Code Relationship & Investigation Toolkit) is a powerful framework for code similarity analysis that enables rapid implementation of "shinglers" - methods that encode properties of disassembled functions for similarity estimation via the MinHash algorithm.
 
-## Make it yours
+The framework is tailored to work with disassembly reports emitted by [SMDA (Smart Disassembler)](https://github.com/danielplohmann/smda), providing a complete solution for analyzing binary code relationships.
 
-Design a docs site that looks great and empowers your users.
+## Key Features
 
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="MinHash Algorithm" icon="fingerprint">
+    Fast similarity estimation using MinHash algorithm with customizable shinglers for encoding function properties
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  
+  <Card title="SMDA Integration" icon="puzzle-piece">
+    Native support for SMDA disassembly reports with automatic function analysis and feature extraction
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  
+  <Card title="Persistent Storage" icon="database">
+    MongoDB backend for persistent data storage with efficient querying and indexing capabilities
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  
+  <Card title="Distributed Architecture" icon="server">
+    Server-worker architecture with REST API for scalable processing of matching jobs
   </Card>
-</Columns>
+  
+  <Card title="Python Client" icon="code">
+    Comprehensive Python client module with full REST API endpoint coverage
+  </Card>
+  
+  <Card title="CLI Interface" icon="terminal">
+    Command-line interface for quick interactions and automation workflows
+  </Card>
+  
+  <Card title="IDA Plugin" icon="plug">
+    Integration with IDA Pro for seamless analysis within your reverse engineering workflow
+  </Card>
+  
+  <Card title="Reference Data" icon="book">
+    Ready-to-use reference data for common compilers and libraries available via [mcrit-data repository](https://github.com/danielplohmann/mcrit-data)
+  </Card>
+</CardGroup>
 
-## Create beautiful pages
+## Use Cases
 
-Everything you need to create world-class documentation.
+MCRIT is designed for security researchers and malware analysts who need to:
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+- **Identify similar functions** across large binary datasets
+- **Track code reuse** in malware families and variants
+- **Build reference libraries** of compiler-generated code and common libraries
+- **Analyze relationships** between different binary samples
+- **Label and classify** functions based on similarity matches
+- **Detect unique code blocks** for signature generation
 
-## Need inspiration?
+## Get Started
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get up and running with MCRIT in minutes using Docker
+  </Card>
+  
+  <Card title="Installation" icon="download" href="/installation">
+    Detailed installation instructions for Docker and standalone setups
+  </Card>
+</CardGroup>
+
+## Architecture Overview
+
+MCRIT consists of three main components:
+
+1. **Server**: REST API interface for submitting samples and querying results
+2. **Worker**: Background processing engine for matching jobs and MinHash calculation
+3. **Database**: MongoDB instance for persistent storage of samples, functions, and matches
+
+```mermaid
+graph LR
+    A[Client] --> B[Server]
+    B --> C[Database]
+    B --> D[Queue]
+    D --> E[Worker]
+    E --> C
+```
+
+## Version
+
+Current stable version: **1.4.5** (December 2025)
+
+<Warning>
+Version 1.3.0 introduced breaking changes with indexing improvements for PicHash and MinHash. When upgrading from earlier versions, recalculation of all hashes is recommended for full backward compatibility.
+</Warning>
+
+## License
+
+MCRIT is released under the GNU General Public License v3 (GPLv3).
+
+## Credits
+
+MCRIT is developed by:
+- Daniel Plohmann
+- Manuel Blatt
+- Steffen Enders
+- Paul Hordiienko
+
+With special thanks to the community contributors who have helped improve the project!

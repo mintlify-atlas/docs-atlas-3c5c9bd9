@@ -1,0 +1,261 @@
+---
+title: 'Authentication'
+description: 'Configure authentication for the MCRIT Python Client'
+---
+
+## Overview
+
+The McritClient supports authentication through API tokens and username headers. These credentials are passed with each request to identify and authorize the client.
+
+## Constructor Parameters
+
+The McritClient constructor accepts authentication parameters:
+
+```python
+def __init__(self, mcrit_server=None, apitoken=None, username=None, raw_responses=False)
+```
+
+### Parameters
+
+- **`mcrit_server`** (str, optional): URL of the MCRIT server (default: `"http://localhost:8000"`)
+- **`apitoken`** (str, optional): API token for authentication
+- **`username`** (str, optional): Username for identification
+- **`raw_responses`** (bool, optional): If `True`, returns raw HTTP response objects instead of parsed data (default: `False`)
+
+## Using API Tokens
+
+### Pass Token at Instantiation
+
+Provide your API token when creating the client:
+
+```python
+from mcrit.client.McritClient import McritClient
+
+client = McritClient(
+    mcrit_server="http://localhost:8000",
+    apitoken="your-secret-api-token-here"
+)
+
+# The token is now included in all requests
+status = client.getStatus()
+```
+
+### Set Token After Instantiation
+
+You can set or update the API token using the `setApitoken()` method:
+
+```python
+client = McritClient(mcrit_server="http://localhost:8000")
+
+# Set the API token later
+client.setApitoken("your-secret-api-token-here")
+
+# Now make authenticated requests
+samples = client.getSamples()
+```
+
+**Method Signature:**
+
+```python
+def setApitoken(self, apitoken):
+    self.headers.update({"apitoken": apitoken})
+```
+
+## Using Username
+
+### Pass Username at Instantiation
+
+Provide your username when creating the client:
+
+```python
+from mcrit.client.McritClient import McritClient
+
+client = McritClient(
+    mcrit_server="http://localhost:8000",
+    username="analyst123"
+)
+
+# The username is now included in all requests
+families = client.getFamilies()
+```
+
+### Set Username After Instantiation
+
+You can set or update the username using the `setUsername()` method:
+
+```python
+client = McritClient(mcrit_server="http://localhost:8000")
+
+# Set the username later
+client.setUsername("analyst123")
+
+# Now make requests with username header
+functions = client.getFunctions()
+```
+
+**Method Signature:**
+
+```python
+def setUsername(self, username):
+    self.headers.update({"username": username})
+```
+
+## Combined Authentication
+
+You can use both API token and username together:
+
+```python
+from mcrit.client.McritClient import McritClient
+
+client = McritClient(
+    mcrit_server="https://mcrit.example.com",
+    apitoken="your-secret-api-token-here",
+    username="analyst123"
+)
+
+# Both credentials are sent with every request
+sample = client.getSampleById(42)
+```
+
+Or set them separately:
+
+```python
+client = McritClient(mcrit_server="https://mcrit.example.com")
+
+# Configure authentication
+client.setApitoken("your-secret-api-token-here")
+client.setUsername("analyst123")
+
+# Make authenticated requests
+result = client.requestMatchesForSample(sample_id=1)
+```
+
+## Raw Responses Mode
+
+The `raw_responses` parameter controls how the client processes responses:
+
+```python
+# Default mode: returns parsed Python objects
+client = McritClient(
+    mcrit_server="http://localhost:8000",
+    apitoken="your-api-token",
+    raw_responses=False  # Default
+)
+
+sample = client.getSampleById(1)  # Returns a SampleEntry object
+
+# Raw mode: returns HTTP Response objects
+client_raw = McritClient(
+    mcrit_server="http://localhost:8000",
+    apitoken="your-api-token",
+    raw_responses=True
+)
+
+response = client_raw.getSampleById(1)  # Returns requests.Response object
+if response.status_code == 200:
+    data = response.json()
+```
+
+### When to Use Raw Responses
+
+- **Debugging**: Inspect raw HTTP responses and status codes
+- **Custom parsing**: Handle response data differently
+- **Error handling**: Access detailed error information from response headers
+- **Performance**: Skip automatic object instantiation when not needed
+
+## Full Example: Authenticated Client
+
+Here's a complete example showing authentication setup and usage:
+
+```python
+from mcrit.client.McritClient import McritClient
+import os
+
+# Load credentials from environment variables
+API_TOKEN = os.getenv("MCRIT_API_TOKEN")
+USERNAME = os.getenv("MCRIT_USERNAME")
+SERVER_URL = os.getenv("MCRIT_SERVER", "http://localhost:8000")
+
+# Create authenticated client
+client = McritClient(
+    mcrit_server=SERVER_URL,
+    apitoken=API_TOKEN,
+    username=USERNAME
+)
+
+# Verify connection
+try:
+    version = client.getVersion()
+    print(f"Connected to MCRIT v{version}")
+    
+    # Get server status
+    status = client.getStatus()
+    print(f"Server status: {status}")
+    
+    # Perform operations
+    samples = client.getSamples(start=0, limit=10)
+    print(f"Retrieved {len(samples)} samples")
+    
+except Exception as e:
+    print(f"Authentication or connection failed: {e}")
+```
+
+## Security Best Practices
+
+<Warning>
+  Never hardcode API tokens or credentials directly in your source code.
+</Warning>
+
+### Use Environment Variables
+
+```python
+import os
+from mcrit.client.McritClient import McritClient
+
+client = McritClient(
+    mcrit_server=os.getenv("MCRIT_SERVER"),
+    apitoken=os.getenv("MCRIT_API_TOKEN"),
+    username=os.getenv("MCRIT_USERNAME")
+)
+```
+
+### Use Configuration Files
+
+```python
+import json
+from mcrit.client.McritClient import McritClient
+
+# Load from config file (ensure file permissions are restricted)
+with open("/secure/path/mcrit_config.json") as f:
+    config = json.load(f)
+
+client = McritClient(
+    mcrit_server=config["server"],
+    apitoken=config["api_token"],
+    username=config["username"]
+)
+```
+
+### Rotate Tokens Regularly
+
+Change your API tokens periodically and immediately if compromised:
+
+```python
+# Update token on an existing client
+client.setApitoken("new-rotated-api-token")
+```
+
+## HTTP Headers
+
+Authentication credentials are sent as HTTP headers with each request:
+
+- **`apitoken`**: Your API token
+- **`username`**: Your username
+
+These headers are managed internally by the client and added to all requests automatically.
+
+## Next Steps
+
+- [Explore the client overview](/client/overview) to learn about available operations
+- Review the [API Reference](/client/overview) for detailed method documentation
+- See [Quickstart](/quickstart) for end-to-end examples

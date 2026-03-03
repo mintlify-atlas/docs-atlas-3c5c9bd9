@@ -1,0 +1,216 @@
+---
+title: "Queue Configuration"
+description: "Configure job queue and worker behavior"
+---
+
+## Overview
+
+MCRIT uses a queue system to manage asynchronous jobs such as sample processing, MinHash calculation, and matching operations. The `QueueConfig` class controls queue backend, MongoDB connection, and worker behavior.
+
+## Queue Method
+
+<ParamField path="QUEUE_METHOD" type="QueueFactory constant" default="QueueFactory.QUEUE_METHOD_MONGODB">
+  Queue backend implementation to use:
+  - `QueueFactory.QUEUE_METHOD_MONGODB` - MongoDB-based queue (default, recommended)
+  - `QueueFactory.QUEUE_METHOD_FAKE` - Fake/mock queue for testing
+</ParamField>
+
+## MongoDB Connection
+
+<ParamField path="QUEUE_SERVER" type="string" default='127.0.0.1'>
+  MongoDB server hostname or IP address for the queue database.
+</ParamField>
+
+<ParamField path="QUEUE_PORT" type="string" default='27017'>
+  MongoDB server port number for the queue database.
+</ParamField>
+
+<ParamField path="QUEUE_MONGODB_DBNAME" type="string" default='mcrit'>
+  Name of the MongoDB database to use for queue storage.
+  
+  <Warning>
+  By default, both the storage database (`STORAGE_MONGODB_DBNAME`) and queue database use the name "mcrit". Changing one does not automatically change the other. They can use the same database or separate databases.
+  </Warning>
+</ParamField>
+
+<ParamField path="QUEUE_MONGODB_USERNAME" type="string" default="None">
+  MongoDB authentication username for the queue database. Set to `None` if authentication is not required.
+</ParamField>
+
+<ParamField path="QUEUE_MONGODB_PASSWORD" type="string" default="None">
+  MongoDB authentication password for the queue database. Set to `None` if authentication is not required.
+</ParamField>
+
+<ParamField path="QUEUE_MONGODB_FLAGS" type="string" default=''>
+  Additional MongoDB connection string flags (e.g., `"authSource=admin&ssl=true"`).
+</ParamField>
+
+<ParamField path="QUEUE_MONGODB_COLLECTION_NAME" type="string" default='queue'>
+  Name of the MongoDB collection to use for storing queue jobs.
+</ParamField>
+
+## Worker Configuration
+
+<ParamField path="QUEUE_TIMEOUT" type="int" default="300">
+  Job timeout in seconds. Workers will terminate jobs that exceed this duration.
+  
+  Default: `300` seconds (5 minutes)
+  
+  <Note>
+  Increase this value if you process large samples or perform complex matching operations that take longer than 5 minutes.
+  </Note>
+</ParamField>
+
+<ParamField path="QUEUE_MAX_ATTEMPTS" type="int" default="3">
+  Maximum number of times a failed job will be retried before being marked as permanently failed.
+</ParamField>
+
+## Cleanup Configuration
+
+<ParamField path="QUEUE_CLEAN_INTERVAL" type="int" default="1200">
+  Time in seconds each worker waits between cleanup operations. Default: `20 * 60` (20 minutes).
+  
+  Cleanup operations remove completed, failed, and expired jobs from the queue to prevent unbounded growth.
+  
+  <Note>
+  Each worker performs cleanup independently on this schedule. With multiple workers, cleanup happens more frequently across the system.
+  </Note>
+</ParamField>
+
+## Spawning Worker Configuration
+
+<ParamField path="QUEUE_SPAWNINGWORKER_CHILDREN_TIMEOUT" type="int" default="3600">
+  Timeout in seconds for child processes spawned by the SpawningWorker. Default: `60 * 60` (1 hour).
+  
+  The SpawningWorker creates child processes for isolation and resource management. This timeout prevents hung child processes from consuming resources indefinitely.
+</ParamField>
+
+## Connection String Format
+
+Queue MongoDB connection strings follow the same format as storage connections:
+
+```
+mongodb://[username:password@]server[:port]/database[?flags]
+```
+
+## Example Configurations
+
+### Basic Configuration (Same Database as Storage)
+```python
+from mcrit.config.QueueConfig import QueueConfig
+
+queue_config = QueueConfig(
+    QUEUE_SERVER="127.0.0.1",
+    QUEUE_PORT="27017",
+    QUEUE_MONGODB_DBNAME="mcrit"
+)
+```
+
+### Separate Queue Database
+```python
+queue_config = QueueConfig(
+    QUEUE_SERVER="127.0.0.1",
+    QUEUE_PORT="27017",
+    QUEUE_MONGODB_DBNAME="mcrit_queue",
+    QUEUE_MONGODB_COLLECTION_NAME="jobs"
+)
+```
+
+### Authenticated Remote Queue
+```python
+queue_config = QueueConfig(
+    QUEUE_SERVER="queue.example.com",
+    QUEUE_PORT="27017",
+    QUEUE_MONGODB_DBNAME="mcrit_prod_queue",
+    QUEUE_MONGODB_USERNAME="queue_user",
+    QUEUE_MONGODB_PASSWORD="secure_password",
+    QUEUE_MONGODB_FLAGS="authSource=admin&ssl=true"
+)
+```
+
+### Long-Running Job Configuration
+```python
+queue_config = QueueConfig(
+    QUEUE_TIMEOUT=1800,  # 30 minutes
+    QUEUE_MAX_ATTEMPTS=5,
+    QUEUE_SPAWNINGWORKER_CHILDREN_TIMEOUT=7200  # 2 hours
+)
+```
+
+### Aggressive Cleanup Configuration
+```python
+queue_config = QueueConfig(
+    QUEUE_CLEAN_INTERVAL=300,  # 5 minutes
+    QUEUE_TIMEOUT=600,  # 10 minutes
+    QUEUE_MAX_ATTEMPTS=2
+)
+```
+
+## Worker Behavior
+
+### Job Lifecycle
+
+1. **Queued**: Job is submitted to the queue
+2. **Processing**: Worker picks up the job
+3. **Timeout Check**: Job must complete within `QUEUE_TIMEOUT` seconds
+4. **Retry Logic**: Failed jobs retry up to `QUEUE_MAX_ATTEMPTS` times
+5. **Cleanup**: Completed/failed jobs are removed after `QUEUE_CLEAN_INTERVAL`
+
+### Spawning Workers
+
+Spawning workers create isolated child processes for each job:
+
+- Provides process isolation for stability
+- Allows resource limits per job
+- Child processes timeout after `QUEUE_SPAWNINGWORKER_CHILDREN_TIMEOUT`
+- Automatically cleaned up on completion or timeout
+
+### Multiple Workers
+
+When running multiple workers:
+
+- Each worker independently processes jobs from the queue
+- Each worker performs cleanup on its own schedule
+- Total cleanup frequency = `number_of_workers × (1 / QUEUE_CLEAN_INTERVAL)`
+- Jobs are distributed automatically via MongoDB queue locking
+
+## Performance Considerations
+
+1. **Timeout Values**: Set based on your workload:
+   - Small samples: 300 seconds (default) is sufficient
+   - Large samples (100K+ functions): Consider 1800-3600 seconds
+   - Complex matching: May require extended timeouts
+
+2. **Cleanup Interval**: Balance between:
+   - More frequent cleanup: Smaller queue collection size
+   - Less frequent cleanup: Lower MongoDB overhead
+
+3. **Max Attempts**: Consider:
+   - Transient failures: Higher values allow recovery
+   - Permanent failures: Lower values prevent wasted resources
+
+4. **Queue Database**: Options:
+   - **Same database as storage**: Simpler configuration, single connection
+   - **Separate database**: Better isolation, independent scaling
+
+## Monitoring Queue Health
+
+To monitor queue performance:
+
+```python
+from mcrit.queue.QueueFactory import QueueFactory
+
+queue = QueueFactory.getQueue(queue_config)
+
+# Check queue status
+status = queue.getStatus()
+print(f"Pending jobs: {status['pending']}")
+print(f"Processing jobs: {status['processing']}")
+print(f"Failed jobs: {status['failed']}")
+```
+
+## Related Configuration
+
+- [Storage Configuration](/configuration/storage) - MongoDB connection for storage
+- [Server Configuration](/configuration/server) - Worker process configuration with Gunicorn
+- [MinHash Configuration](/configuration/minhash) - Operations that run through the queue

@@ -1,0 +1,282 @@
+---
+title: IDA Plugin
+description: Use the MCRIT IDA plugin to query functions and import labels directly from IDA Pro
+---
+
+The MCRIT IDA plugin integrates MCRIT functionality directly into IDA Pro, allowing you to query functions, view matches, and import labels without leaving your disassembly environment.
+
+## Installation
+
+<Steps>
+  <Step title="Create Configuration File">
+    Copy the template configuration and customize it for your MCRIT deployment:
+
+    ```bash
+    cp ./plugins/ida/template.config.py ./plugins/ida/config.py
+    nano ./plugins/ida/config.py
+    ```
+
+    The configuration file should specify:
+    - MCRIT server URL
+    - API token (if authentication is enabled)
+    - Connection timeout settings
+    - Default query parameters
+  </Step>
+
+  <Step title="Verify Plugin Location">
+    Ensure the plugin files are accessible:
+
+    ```
+    ./plugins/ida/ida_mcrit.py
+    ./plugins/ida/config.py
+    ```
+  </Step>
+
+  <Step title="Load in IDA">
+    In IDA Pro, load the plugin by running the script:
+
+    ```
+    File → Script file → plugins/ida/ida_mcrit.py
+    ```
+
+    Or use IDA's script command:
+    ```python
+    ida> execfile("./plugins/ida/ida_mcrit.py")
+    ```
+  </Step>
+</Steps>
+
+## Configuration
+
+### config.py Template
+
+```python config.py
+# MCRIT Server Configuration
+MCRIT_SERVER = "http://localhost:8000"
+API_TOKEN = "your-api-token-here"  # Optional
+
+# Query Settings
+DEFAULT_MINHASH_THRESHOLD = 0.75
+DEFAULT_PICHASH_SIZE = 8
+
+# UI Settings
+MAX_RESULTS_DISPLAY = 100
+```
+
+Adjust these settings based on your MCRIT instance deployment:
+
+- **Remote Server**: Update `MCRIT_SERVER` to point to your remote MCRIT instance
+- **Authentication**: Set `API_TOKEN` if your server requires authentication
+- **Thresholds**: Adjust matching thresholds for sensitivity vs. performance
+
+## Plugin Features
+
+The IDA plugin provides several key features for interactive analysis:
+
+### Function Queries
+
+Query MCRIT for matches to the currently viewed function in IDA:
+
+<Steps>
+  <Step title="Navigate to Function">
+    Position your cursor in any function you want to analyze.
+  </Step>
+
+  <Step title="Trigger Query">
+    Use the plugin menu or hotkey to query the current function against the MCRIT database.
+  </Step>
+
+  <Step title="View Results">
+    The plugin displays matching functions with:
+    - Match score (MinHash similarity)
+    - Sample and family information
+    - Function name and offset
+    - Number of matching basic blocks
+  </Step>
+</Steps>
+
+### PicBlockHash Queries
+
+Query individual basic blocks using PicBlockHash:
+
+1. Select a basic block in the graph view
+2. Execute PicBlockHash query
+3. View all functions containing similar basic blocks
+
+This is useful for:
+- Finding common code patterns
+- Identifying shared library functions
+- Tracking specific code fragments across samples
+
+### Colored Graph Display
+
+Visualize remote functions with colored graph views:
+
+- **Matching blocks**: Highlighted in green
+- **Unique blocks**: Highlighted in red
+- **Partial matches**: Color-coded by similarity score
+
+This helps identify:
+- Which parts of the function match known code
+- Unique or modified blocks
+- Overall code similarity patterns
+
+### Matching Jobs
+
+Submit full matching jobs from IDA:
+
+1. Submit current binary to MCRIT
+2. Task matching job against database
+3. Monitor job progress in plugin UI
+4. View results when complete
+
+### Label Import
+
+Batch import function labels from MCRIT matches:
+
+<Steps>
+  <Step title="Review Matches">
+    Review the matching results and select functions to import labels from.
+  </Step>
+
+  <Step title="Import Labels">
+    Use the batch import feature to apply labels from matching functions.
+  </Step>
+
+  <Step title="Verify Labels">
+    Check that function names have been updated in IDA's disassembly view.
+  </Step>
+</Steps>
+
+Label import is particularly useful for:
+- Quickly annotating known library functions
+- Importing analysis from previously analyzed samples
+- Standardizing function names across related samples
+
+## Usage Workflow
+
+### Typical Analysis Session
+
+<Steps>
+  <Step title="Load Binary in IDA">
+    Open your target binary in IDA Pro and wait for initial auto-analysis to complete.
+  </Step>
+
+  <Step title="Load MCRIT Plugin">
+    ```python
+    ida> execfile("./plugins/ida/ida_mcrit.py")
+    ```
+  </Step>
+
+  <Step title="Query Interesting Functions">
+    Navigate to suspicious or interesting functions and query them against MCRIT:
+    - Cryptographic routines
+    - Network communication functions
+    - Suspicious API usage patterns
+  </Step>
+
+  <Step title="Review Matches">
+    Analyze the matching results to identify:
+    - Known malware families
+    - Compiler library functions
+    - Code reuse patterns
+  </Step>
+
+  <Step title="Import Labels">
+    Batch import labels for library functions and known malware functions to speed up analysis.
+  </Step>
+
+  <Step title="Export Findings">
+    Use the plugin to export your analysis and contribute to the MCRIT database.
+  </Step>
+</Steps>
+
+### Advanced Features
+
+#### Filtering Results
+
+The plugin supports filtering match results by:
+
+- **Block size**: Minimum basic block count
+- **MinHash score**: Similarity threshold
+- **Family**: Specific malware families
+- **Sample**: Specific samples
+
+```python
+# Example filter settings
+MIN_BLOCK_SIZE = 3
+MIN_MINHASH_SCORE = 0.80
+FAMILY_FILTER = "emotet"
+```
+
+#### Graph Comparison
+
+Compare function control flow graphs:
+
+1. Query function and select match
+2. Request colored graph display
+3. View side-by-side comparison
+4. Identify structural differences
+
+## Best Practices
+
+### Performance Optimization
+
+- **Filter early**: Use score thresholds to reduce result count
+- **Block size filtering**: Exclude tiny functions to focus on significant matches
+- **Local caching**: The plugin caches results to reduce server queries
+
+### Analysis Strategy
+
+1. **Start broad**: Query main/entry point functions first
+2. **Focus on unique code**: Skip obvious library functions
+3. **Cross-reference**: Use multiple functions to build confidence
+4. **Validate matches**: Don't trust scores alone, review actual code
+
+### Collaboration
+
+- **Consistent labeling**: Use standard naming conventions for imported labels
+- **Submit improvements**: Contribute labeled functions back to MCRIT
+- **Share configs**: Standardize configuration across your team
+
+## Troubleshooting
+
+### Connection Issues
+
+```python
+# Verify server connectivity
+import requests
+response = requests.get("http://localhost:8000/status")
+print(response.json())
+```
+
+### Plugin Not Loading
+
+- Verify config.py exists and is valid Python
+- Check IDA Python environment compatibility
+- Review IDA output window for error messages
+
+### No Matches Found
+
+- Lower MinHash threshold
+- Check if database contains relevant samples
+- Verify function has sufficient basic blocks
+- Try PicHash query as alternative
+
+## Version Compatibility
+
+The IDA plugin is compatible with:
+
+- IDA Pro 7.x and later
+- Python 2.7 and Python 3.x (depending on IDA version)
+- MCRIT server v1.0.0 and later
+
+<Note>
+  The plugin has been moved to a separate repository at [mcrit-plugins](https://github.com/danielplohmann/mcrit-plugins) as of version 1.4.4.
+</Note>
+
+## Additional Resources
+
+- Plugin source code: `./plugins/ida/ida_mcrit.py`
+- Configuration template: `./plugins/ida/template.config.py`
+- Example workflows and screenshots in the MCRIT wiki

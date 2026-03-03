@@ -1,0 +1,468 @@
+---
+title: 'Status & System'
+description: 'System status, maintenance, and search endpoints'
+---
+
+## Overview
+
+Status endpoints provide system information, maintenance operations, data export/import, and search functionality across families, samples, and functions.
+
+---
+
+## Get Welcome Message
+
+<RequestExample>
+```bash cURL
+curl -X GET https://your-mcrit-instance/
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "message": "Welcome to MCRIT"
+  }
+}
+```
+</ResponseExample>
+
+---
+
+## Get Status
+
+<ParamField query="with_pichash" type="boolean" default="false">
+  Include PicHash statistics in the status response
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://your-mcrit-instance/status?with_pichash=true"
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "samples": 1234,
+    "functions": 56789,
+    "families": 42,
+    "pichash_index_size": 12345,
+    "minhash_index_size": 67890
+  }
+}
+```
+</ResponseExample>
+
+Returns current system statistics including number of samples, functions, families, and optionally PicHash index information.
+
+---
+
+## Get Version
+
+<RequestExample>
+```bash cURL
+curl -X GET https://your-mcrit-instance/version
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "version": "1.2.3"
+  }
+}
+```
+</ResponseExample>
+
+Returns the MCRIT version information.
+
+---
+
+## Get Config
+
+<RequestExample>
+```bash cURL
+curl -X GET https://your-mcrit-instance/config
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "not_implemented"
+}
+```
+</ResponseExample>
+
+<Warning>This endpoint is currently not implemented and returns HTTP 501.</Warning>
+
+---
+
+## Export Data
+
+<ParamField query="compress" type="boolean" default="false">
+  Compress the exported data
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://your-mcrit-instance/export?compress=true"
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "samples": {...},
+    "families": {...},
+    "functions": {...}
+  }
+}
+```
+</ResponseExample>
+
+Exports the entire MCRIT database. Use the `compress` parameter to reduce payload size.
+
+<Note>Large databases may exceed memory limits. Consider using the selective export endpoint for partial exports.</Note>
+
+---
+
+## Export Selection
+
+<ParamField path="comma_separated_sample_ids" type="string" required>
+  Comma-separated list of sample IDs to export (e.g., "1,2,3,42")
+</ParamField>
+
+<ParamField query="compress" type="boolean" default="false">
+  Compress the exported data
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://your-mcrit-instance/export/1,2,3?compress=true"
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "samples": {...},
+    "families": {...},
+    "functions": {...}
+  }
+}
+```
+</ResponseExample>
+
+Exports only the specified samples and their associated data.
+
+---
+
+## Import Data
+
+<RequestExample>
+```bash cURL
+curl -X POST https://your-mcrit-instance/import \
+  -H "Content-Type: application/json" \
+  -d @export_data.json
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "samples_imported": 42,
+    "functions_imported": 1234,
+    "families_imported": 5
+  }
+}
+```
+</ResponseExample>
+
+Imports previously exported MCRIT data. The request body should contain the JSON export data structure.
+
+---
+
+## Respawn Instance
+
+<RequestExample>
+```bash cURL
+curl -X POST https://your-mcrit-instance/respawn
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "message": "Successfully performed reset of MCRIT instance."
+  }
+}
+```
+</ResponseExample>
+
+<Warning>This operation completely resets the MCRIT instance, deleting ALL data from the database. This action is irreversible.</Warning>
+
+---
+
+## Complete MinHashes
+
+<RequestExample>
+```bash cURL
+curl -X GET https://your-mcrit-instance/complete_minhashes
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "minhashes_updated": 1234,
+    "duration": 45.2
+  }
+}
+```
+</ResponseExample>
+
+Forces recalculation of all MinHash signatures. Useful for ensuring index consistency.
+
+---
+
+## Rebuild Index
+
+<RequestExample>
+```bash cURL
+curl -X GET https://your-mcrit-instance/rebuild_index
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "index_rebuilt": true,
+    "duration": 120.5
+  }
+}
+```
+</ResponseExample>
+
+Forces a complete rebuild of the MinHash LSH index. This operation may take significant time for large databases.
+
+---
+
+## Recalculate PicHashes
+
+<RequestExample>
+```bash cURL
+curl -X GET https://your-mcrit-instance/recalculate_pichashes
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "pichashes_recalculated": 5678,
+    "duration": 30.8
+  }
+}
+```
+</ResponseExample>
+
+Forces recalculation of all PIC hash values for functions in the database.
+
+---
+
+## Recalculate MinHashes
+
+<RequestExample>
+```bash cURL
+curl -X GET https://your-mcrit-instance/recalculate_minhashes
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "minhashes_recalculated": 5678,
+    "duration": 67.3
+  }
+}
+```
+</ResponseExample>
+
+Forces recalculation of MinHash signatures for all functions.
+
+---
+
+## Search Families
+
+<ParamField query="query" type="string" required>
+  Search term to match against family names
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Pagination cursor for fetching next page of results
+</ParamField>
+
+<ParamField query="limit" type="integer" default="100">
+  Maximum number of results to return
+</ParamField>
+
+<ParamField query="sort_by" type="string">
+  Field to sort results by
+</ParamField>
+
+<ParamField query="is_ascending" type="boolean" default="true">
+  Sort order (true for ascending, false for descending)
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://your-mcrit-instance/search/families?query=malware&limit=50&is_ascending=false"
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "results": [
+      {
+        "family_id": 42,
+        "family_name": "malware_family_1",
+        "sample_count": 15
+      }
+    ],
+    "cursor": "next_page_token",
+    "total": 127
+  }
+}
+```
+</ResponseExample>
+
+Search for families matching the query term.
+
+---
+
+## Search Samples
+
+<ParamField query="query" type="string" required>
+  Search term to match against sample metadata
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Pagination cursor for fetching next page of results
+</ParamField>
+
+<ParamField query="limit" type="integer" default="100">
+  Maximum number of results to return
+</ParamField>
+
+<ParamField query="sort_by" type="string">
+  Field to sort results by
+</ParamField>
+
+<ParamField query="is_ascending" type="boolean" default="true">
+  Sort order
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://your-mcrit-instance/search/samples?query=trojan&limit=20"
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "results": [
+      {
+        "sample_id": 123,
+        "sha256": "abc123...",
+        "family_name": "trojan_family",
+        "function_count": 42
+      }
+    ],
+    "cursor": "next_page_token",
+    "total": 89
+  }
+}
+```
+</ResponseExample>
+
+Search for samples matching the query term.
+
+---
+
+## Search Functions
+
+<ParamField query="query" type="string" required>
+  Search term to match against function names or labels
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Pagination cursor for fetching next page of results
+</ParamField>
+
+<ParamField query="limit" type="integer" default="100">
+  Maximum number of results to return
+</ParamField>
+
+<ParamField query="sort_by" type="string">
+  Field to sort results by
+</ParamField>
+
+<ParamField query="is_ascending" type="boolean" default="true">
+  Sort order
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://your-mcrit-instance/search/functions?query=decode&limit=50"
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "results": [
+      {
+        "function_id": 9876,
+        "sample_id": 123,
+        "function_name": "decode_payload",
+        "offset": 4096
+      }
+    ],
+    "cursor": "next_page_token",
+    "total": 234
+  }
+}
+```
+</ResponseExample>
+
+Search for functions matching the query term.

@@ -1,0 +1,145 @@
+---
+title: 'Installation'
+description: 'Install and set up the MCRIT Python Client SDK'
+---
+
+## Installation Methods
+
+### Install from PyPI
+
+The recommended way to install the MCRIT client is via pip:
+
+```bash
+pip install mcrit
+```
+
+This will install the `mcrit` package along with all required dependencies.
+
+### Install from Source
+
+To install from the source repository:
+
+```bash
+# Clone the repository
+git clone https://github.com/danielplohmann/mcrit.git
+cd mcrit
+
+# Install in development mode
+pip install -e .
+```
+
+For development installations, you may want to install with all dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+## Dependencies
+
+The MCRIT client requires the following key dependencies (automatically installed):
+
+- **requests** - HTTP library for API communication
+- **smda** (>=1.13.19) - Binary disassembler for code analysis
+- **picblocks** (>=1.1.2) - PIC hash computation
+- **lief** (>=0.16.0) - Binary parsing
+- **mmh3** (>=2.5.1) - MinHash implementation
+- **numpy** (&lt;2.0.0) - Numerical computations
+- **pymongo** - MongoDB interaction (for local storage)
+- **rapidfuzz** - Fast fuzzy string matching
+- **scipy** - Scientific computing utilities
+
+See the full list in [requirements.txt](https://github.com/danielplohmann/mcrit/blob/main/requirements.txt).
+
+## Import the Client
+
+Once installed, import the McritClient class:
+
+```python
+from mcrit.client.McritClient import McritClient
+```
+
+## Verification
+
+Verify your installation by creating a client instance and checking connectivity:
+
+```python
+from mcrit.client.McritClient import McritClient
+
+# Create a client (replace with your server URL)
+client = McritClient(mcrit_server="http://localhost:8000")
+
+# Check server version
+try:
+    version = client.getVersion()
+    print(f"Connected to MCRIT server version: {version}")
+except Exception as e:
+    print(f"Connection failed: {e}")
+
+# Get server status
+status = client.getStatus()
+if status:
+    print("Successfully connected to MCRIT server")
+    print(f"Status: {status}")
+else:
+    print("Could not retrieve server status")
+```
+
+## Python Version Requirements
+
+MCRIT requires Python 3.7 or higher. Some dependencies may have specific version requirements:
+
+- numpy requires Python 3.8+ for recent versions
+- lief 0.16.0+ requires Python 3.8+
+
+For best compatibility, Python 3.8 or newer is recommended.
+
+## Platform Support
+
+The MCRIT client supports:
+
+- **Linux** (primary development platform)
+- **Windows** (some dependencies like `gunicorn` are excluded on Windows)
+- **macOS** (should work but less tested)
+
+<Note>
+  On Windows, the server component uses `waitress` instead of `gunicorn` as the WSGI server.
+</Note>
+
+## Troubleshooting
+
+### ImportError: No module named 'mcrit'
+
+Ensure the package is installed:
+
+```bash
+pip list | grep mcrit
+```
+
+If not listed, reinstall:
+
+```bash
+pip install --upgrade mcrit
+```
+
+### Connection Refused
+
+If you cannot connect to the MCRIT server:
+
+1. Verify the server is running at the specified URL
+2. Check that the port (default 8000) is accessible
+3. Ensure no firewall is blocking the connection
+
+### Dependency Conflicts
+
+If you encounter dependency conflicts, consider using a virtual environment:
+
+```bash
+python -m venv mcrit-env
+source mcrit-env/bin/activate  # On Windows: mcrit-env\Scripts\activate
+pip install mcrit
+```
+
+## Next Steps
+
+- [Configure authentication](/client/authentication) to access protected endpoints
+- [Explore the client overview](/client/overview) to learn about core capabilities

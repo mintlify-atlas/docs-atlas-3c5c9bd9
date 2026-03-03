@@ -1,0 +1,380 @@
+---
+title: CLI Usage
+description: Use the MCRIT command-line interface for submitting samples, querying, and managing data
+---
+
+The MCRIT CLI provides a command-line interface for interacting with MCRIT servers. It supports sample submission, searching, queue management, and import/export operations.
+
+## Configuration
+
+The CLI can be configured using environment variables or a `.env` file:
+
+```bash .env
+MCRIT_CLI_SERVER=http://localhost:8000
+MCRIT_CLI_APITOKEN=your-api-token-here
+```
+
+These variables allow you to avoid specifying the server URL and API token with each command.
+
+## Submit Command
+
+The `submit` command supports multiple modes for adding samples to MCRIT.
+
+### Command Syntax
+
+```bash
+mcrit client submit [-h] [--mode {file,dir,recursive,malpedia}] 
+                    [-f FAMILY] [-v VERSION] [-l] [-x] [-o OUTPUT]
+                    [-s] [-w] [-t WORKER_TIMEOUT]
+                    filepath
+```
+
+### Submit Single File
+
+Submit a single binary file to MCRIT:
+
+```bash
+mcrit client submit --mode file malware.exe -f emotet -v 2023-01
+```
+
+**Mapped Files**: If the filename ends with `0x[0-9a-fA-F]{8,16}`, the CLI treats it as a memory dump and uses that address as the image base:
+
+```bash
+mcrit client submit --mode file sample_dump_0x00400000
+# Output: 0.906s -> (architecture: intel.32bit, base_addr: 0x00400000): 922 functions
+```
+
+### Submit Directory
+
+Submit all files in a directory (non-recursive):
+
+```bash
+mcrit client submit --mode dir ~/samples/wannacry/ -f wannacry -v 2017-05
+```
+
+<CodeGroup>
+```bash Basic Directory
+mcrit client submit --mode dir ~/samples/emotet/
+```
+
+```bash With Family Override
+mcrit client submit --mode dir ~/samples/ -f ransomware -v unknown
+```
+
+```bash Executables Only
+mcrit client submit --mode dir ~/samples/ -x
+```
+</CodeGroup>
+
+Example output:
+```
+ 0.763s -> (architecture: intel.32bit, base_addr: 0x00400000): 926 functions
+ 0.884s -> (architecture: intel.32bit, base_addr: 0x00400000): 926 functions
+ 1.378s -> (architecture: intel.32bit, base_addr: 0x00400000): 165 functions
+ 0.830s -> (architecture: intel.32bit, base_addr: 0x00400000): 926 functions
+```
+
+### Recursive Submission
+
+Submit files from a structured directory hierarchy:
+
+```bash
+mcrit client submit --mode recursive ~/malware_collection/
+```
+
+This mode expects a directory structure like:
+```
+./family_name/version/version/files
+```
+
+The CLI automatically extracts `family_name` and `version` from the directory structure.
+
+<Note>
+  Use the `-l` flag to mark samples as libraries when submitting in recursive mode.
+</Note>
+
+### Malpedia Synchronization
+
+Dedicated mode for synchronizing Malpedia repository data:
+
+```bash
+mcrit client submit --mode malpedia ~/malpedia
+```
+
+This mode:
+- Only processes ELF and PE (win.*) families
+- Only processes files labeled as `_unpacked` or `_dump_0x...`
+- Skips already-imported samples (idempotent)
+- Requires directory named `malpedia` with `malpedia.bib` file
+
+Example output:
+```
+/home/analyst/work/Repositories/malpedia/win.3cx_backdoor/11be1803e2e307b647a8a7e02d128335c448ff741bf06bf52b332e0bbf423b03_unpacked
+ 1.625s -> (architecture: intel.64bit, base_addr: 0x180000000): 717 functions
+/home/analyst/work/Repositories/malpedia/win.8t_dropper/2019-01-23/b541e0e29c34800a067b060d9ee18d8d35c75f056f4246b1ce9561a5441d5a0f_unpacked
+ 0.305s -> (architecture: intel.32bit, base_addr: 0x10000000): 213 functions
+```
+
+### Submit Options
+
+<CodeGroup>
+```bash SMDA Reports Only
+# Submit pre-generated SMDA reports instead of binaries
+mcrit client submit --mode dir ~/reports/ -s
+```
+
+```bash Save SMDA Reports
+# Disassemble and save reports locally
+mcrit client submit --mode dir ~/samples/ -o ~/reports/
+```
+
+```bash With Workers
+# Spawn workers to process submissions in parallel
+mcrit client submit --mode recursive ~/samples/ -w -t 600
+```
+
+```bash Library Samples
+# Mark samples as library code
+mcrit client submit --mode dir ~/libraries/ -l
+```
+</CodeGroup>
+
+**Key flags**:
+- `-f, --family`: Override family name
+- `-v, --version`: Override version
+- `-l, --library`: Mark as library code
+- `-x, --executables_only`: Only process PE/ELF files
+- `-o, --output`: Save SMDA reports to directory
+- `-s, --smda`: Submit SMDA reports instead of binaries
+- `-w, --worker`: Spawn workers for parallel processing
+- `-t, --worker-timeout`: Worker timeout in seconds (default: 300)
+
+## Status Command
+
+Query MCRIT server statistics:
+
+```bash
+mcrit client status
+```
+
+Example output:
+```json
+{
+  "status": {
+    "db_state": 187,
+    "storage_type": "mongodb",
+    "num_bands": 20,
+    "num_samples": 137,
+    "num_families": 14,
+    "num_functions": 129110,
+    "num_pichashes": 25385
+  }
+}
+```
+
+## Search Command
+
+Search across families, samples, and functions:
+
+```bash
+mcrit client search <search_term>
+```
+
+<CodeGroup>
+```bash Search by Name
+mcrit client search wannacry
+```
+
+```bash Search by Hash
+mcrit client search ca29de1dc881786
+```
+</CodeGroup>
+
+Example output:
+```
+Family Search Results
+Famliy 2 (win.wannacry): 
+********************
+Sample Search Results
+Sample 1 (intel, 32 bit) - ca29de1dc8817868c93e54b09f557fe14e40083c0955294df5bd91f52ba469c8_unpacked (win.wannacry): 
+Sample 2 (intel, 32 bit) - 3e6de9e2baacf930949647c399818e7a2caea2626df6a468407854aaa515eed9 (win.wannacry): 
+********************
+```
+
+The search command queries:
+- Family names
+- Sample filenames and hashes
+- Function names and labels
+
+## Queue Command
+
+View processing queue status and job history:
+
+```bash
+mcrit client queue
+```
+
+Example output:
+```
+64243b27f3876416bffad86e 64243b28cbc77c2df4d8d79f | 2023-03-29T13:20:39.065Z 2023-03-29T13:20:39.114Z 2023-03-29T13:20:40.593Z | updateMinHashesForSample(2) - 1
+64131888fbb4d9d4a029164d 6413188c15e4f20d519b35ba | 2023-03-16T13:24:24.707Z 2023-03-16T13:24:24.755Z 2023-03-16T13:24:28.366Z | addBinarySample(None, ca29de1dc8817868c93e54b09f557fe14e40083c0955294df5bd91f52ba469c8_unpacked, win.wannacry, , False, 0, 32) - 1
+641316eefbb4d9d4a029164a 641316f115e4f20d519b322b | 2023-03-16T13:17:34.834Z 2023-03-16T13:17:34.859Z 2023-03-16T13:17:37.238Z | addBinarySample(None, 766d7d591b9ec1204518723a1e5940fd6ac777f606ed64e731fd91b0b4c3d9fc_dump_0x10000000, win.contopee, , True, 268435456, 32) - 1
+```
+
+Each line shows:
+- Job ID and Result ID
+- Timestamps (created, started, finished)
+- Job method and parameters
+- Worker ID
+
+## Export Command
+
+Export samples to MCRIT-compatible files:
+
+```bash
+mcrit client export [--sample_ids SAMPLE_IDS] filepath
+```
+
+<CodeGroup>
+```bash Export Specific Samples
+mcrit client export --sample_ids 0,1,2 samples.mcrit
+```
+
+```bash Export All Samples
+mcrit client export all_data.mcrit
+```
+</CodeGroup>
+
+Example output:
+```
+wrote export to sample_0.mcrit.
+```
+
+Export file format:
+```json
+{
+  "content": {
+    "is_compressed": true,
+    "num_families": 1,
+    "num_samples": 1,
+    "num_functions": 214
+  },
+  "config": {
+    "version": "0.19.0",
+    "shingler": "7ae53d3b2514730a4d48f993a3e4cd6c6d4a5ca26f93bbed98e0f498295552de",
+    ...
+  },
+  ...
+}
+```
+
+<Note>
+  Exported files include all sample data, function information, MinHashes, and metadata in a portable format.
+</Note>
+
+## Import Command
+
+Import previously exported samples:
+
+```bash
+mcrit client import filepath
+```
+
+```bash
+mcrit client import sample_0.mcrit
+```
+
+Example output:
+```json
+{
+  "num_samples_imported": 0,
+  "num_samples_skipped": 1,
+  "num_functions_imported": 0,
+  "num_functions_skipped": 214,
+  "num_families_imported": 0,
+  "num_families_skipped": 1
+}
+```
+
+The import command:
+- Skips samples already in the database (by hash)
+- Imports new samples and their functions
+- Creates families if they don't exist
+- Reports statistics on imported vs. skipped data
+
+## Query Command
+
+Submit a sample for matching and retrieve results:
+
+```bash
+mcrit client query sample.exe
+```
+
+This command:
+1. Disassembles the binary
+2. Submits it as a matching query
+3. Waits for job completion
+4. Returns matching results
+
+<Note>
+  The query command is useful for one-off analysis without permanently adding samples to the database.
+</Note>
+
+## Common Workflows
+
+### Initial Data Import
+
+<Steps>
+  <Step title="Import Reference Data">
+    ```bash
+    mcrit client import compiler_libs.mcrit
+    ```
+  </Step>
+
+  <Step title="Submit Malware Collection">
+    ```bash
+    mcrit client submit --mode recursive ~/malware/ -w
+    ```
+  </Step>
+
+  <Step title="Monitor Progress">
+    ```bash
+    mcrit client queue
+    ```
+  </Step>
+</Steps>
+
+### Analyze Unknown Sample
+
+<Steps>
+  <Step title="Query Sample">
+    ```bash
+    mcrit client query unknown.exe
+    ```
+  </Step>
+
+  <Step title="Search Results">
+    ```bash
+    mcrit client search emotet
+    ```
+  </Step>
+
+  <Step title="Export for Sharing">
+    ```bash
+    mcrit client export --sample_ids 42 analysis_result.mcrit
+    ```
+  </Step>
+</Steps>
+
+### Malpedia Integration
+
+```bash
+# Initial sync
+mcrit client submit --mode malpedia ~/malpedia -w
+
+# Update with new samples (skips existing)
+mcrit client submit --mode malpedia ~/malpedia -w
+
+# Search for specific family
+mcrit client search emotet
+```

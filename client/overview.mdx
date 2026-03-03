@@ -1,0 +1,137 @@
+---
+title: 'Client SDK Overview'
+description: 'Introduction to the MCRIT Python Client SDK'
+---
+
+## Introduction
+
+The **McritClient** is a Python SDK that provides a convenient interface for interacting with MCRIT servers. It wraps the MCRIT REST API and offers pythonic access to all core functionality including sample management, function analysis, matching operations, and result retrieval.
+
+## What It Provides
+
+The McritClient SDK enables you to:
+
+- **Submit samples** for analysis (binary files or SMDA reports)
+- **Manage families and samples** (CRUD operations)
+- **Query functions** and retrieve function metadata
+- **Request matches** against the MCRIT database
+- **Monitor jobs** and retrieve matching results
+- **Import/Export** data between MCRIT instances
+- **Search** across families, samples, and functions
+- **Analyze unique blocks** for samples and families
+
+## Basic Usage
+
+Here's a simple example of instantiating and using the client:
+
+```python
+from mcrit.client.McritClient import McritClient
+
+# Create a client instance
+client = McritClient(
+    mcrit_server="http://localhost:8000",
+    apitoken="your-api-token",
+    username="your-username"
+)
+
+# Check server status
+status = client.getStatus()
+print(f"Server version: {client.getVersion()}")
+
+# Get all samples
+samples = client.getSamples()
+print(f"Total samples: {len(samples)}")
+
+# Get a specific sample by ID
+sample = client.getSampleById(sample_id=1)
+if sample:
+    print(f"Sample: {sample.filename}")
+```
+
+## Main Capabilities
+
+### Sample Management
+
+Submit binaries or SMDA reports for analysis:
+
+```python
+# Add a binary sample
+with open("malware.exe", "rb") as f:
+    binary = f.read()
+    result = client.addBinarySample(
+        binary=binary,
+        filename="malware.exe",
+        family="wannacry",
+        version="1.0"
+    )
+
+# Add an SMDA report
+from smda.Disassembler import Disassembler
+disassembler = Disassembler()
+report = disassembler.disassembleFile("/path/to/binary")
+sample_entry, job_id = client.addReport(report)
+```
+
+### Function Analysis
+
+Retrieve and analyze functions:
+
+```python
+# Get all functions for a sample
+functions = client.getFunctionsBySampleId(sample_id=1)
+
+# Get a specific function
+function = client.getFunctionById(function_id=42, with_xcfg=True)
+```
+
+### Matching Operations
+
+Request matches against the MCRIT database:
+
+```python
+# Match a sample against the database
+job_id = client.requestMatchesForSample(
+    sample_id=1,
+    minhash_threshold=0.8
+)
+
+# Wait for results
+result = client.awaitResult(job_id)
+
+# Query with an SMDA report
+job_id = client.requestMatchesForSmdaReport(
+    smda_report=report,
+    minhash_threshold=0.75,
+    pichash_size=8
+)
+```
+
+### Job and Result Management
+
+```python
+# Get job status
+job = client.getJobData(job_id)
+
+# Get result for a completed job
+result = client.getResultForJob(job_id, compact=False)
+
+# Get queue statistics
+stats = client.getQueueStatistics()
+```
+
+## REST API Wrapper
+
+The McritClient wraps the MCRIT REST API endpoints and handles:
+
+- **HTTP request construction** with proper headers and authentication
+- **Response parsing** and data conversion to Python objects
+- **Error handling** with appropriate status code checks
+- **Data serialization** between Python objects and JSON
+
+All network communication uses the `requests` library, and responses are automatically parsed into native Python types (SampleEntry, FunctionEntry, FamilyEntry, Job objects, etc.).
+
+## Next Steps
+
+- [Install the client](/client/installation) and set up your environment
+- [Configure authentication](/client/authentication) with API tokens
+- Explore the [API Reference](/client/overview) for detailed method documentation

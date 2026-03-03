@@ -1,0 +1,327 @@
+---
+title: 'Query'
+description: 'Query for matches without persisting samples'
+---
+
+## Overview
+
+Query endpoints allow you to search for matches against the database without permanently adding the query sample. These operations are useful for one-time lookups and triage.
+
+---
+
+## Query Parameters
+
+Query endpoints support the same matching parameters as the matching endpoints:
+
+<ParamField query="minhash_score" type="integer" default="50">
+  Minimum MinHash similarity score (0-100)
+</ParamField>
+
+<ParamField query="band_matches_required" type="integer">
+  Minimum number of LSH band matches required
+</ParamField>
+
+<ParamField query="pichash_size" type="integer">
+  Size threshold for PicHash matching
+</ParamField>
+
+<ParamField query="force_recalculation" type="boolean" default="false">
+  Force recalculation of matches
+</ParamField>
+
+---
+
+## Query SMDA Report
+
+<RequestExample>
+```bash cURL
+curl -X POST "https://your-mcrit-instance/query?minhash_score=70" \
+  -H "Content-Type: application/json" \
+  -d @smda_report.json
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "query_sample": {
+      "sha256": "abc123...",
+      "function_count": 98
+    },
+    "matches": {
+      "123": {
+        "sample_id": 123,
+        "sha256": "def456...",
+        "family": "malware_family",
+        "matched_functions": 42,
+        "match_score": 0.87
+      }
+    },
+    "total_matches": 5
+  }
+}
+```
+</ResponseExample>
+
+Query the database using an SMDA disassembly report. The report is analyzed but not stored.
+
+---
+
+## Query Binary (Unmapped)
+
+<RequestExample>
+```bash cURL
+curl -X POST "https://your-mcrit-instance/query/binary?minhash_score=70" \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @sample.exe
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "query_sample": {
+      "sha256": "abc123...",
+      "function_count": 98,
+      "bitness": 32
+    },
+    "matches": {...},
+    "total_matches": 5
+  }
+}
+```
+</ResponseExample>
+
+Query using a raw binary file. SMDA will automatically detect the architecture and base address.
+
+---
+
+## Query Binary (Mapped)
+
+<ParamField path="base_address" type="string" required>
+  Base address in hexadecimal (e.g., "0x400000", "400000", or "0" for automatic detection)
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X POST "https://your-mcrit-instance/query/binary/mapped/0x400000?minhash_score=70" \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @memory_dump.bin
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "query_sample": {
+      "sha256": "abc123...",
+      "base_address": 4194304,
+      "function_count": 76
+    },
+    "matches": {...},
+    "total_matches": 3
+  }
+}
+```
+</ResponseExample>
+
+Query using a memory dump with a specific base address. This is useful for analyzing memory dumps where the load address is known.
+
+<Note>The base address accepts hexadecimal formats: "0x400000", "400000", or "0" for automatic detection.</Note>
+
+---
+
+## Query Function
+
+<RequestExample>
+```bash cURL
+curl -X POST "https://your-mcrit-instance/query/function?minhash_score=80" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "offset": 4096,
+    "function_name": "suspicious_function",
+    "instructions": [...],
+    "blocks": [...]
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "query_function": {
+      "offset": 4096,
+      "num_instructions": 156,
+      "num_blocks": 23,
+      "pichash": "a1b2c3d4e5f6a7b8"
+    },
+    "matches": {
+      "9876": {
+        "function_id": 9876,
+        "sample_id": 123,
+        "family": "malware_family",
+        "function_name": "decode_payload",
+        "minhash_score": 0.92,
+        "pichash_match": true
+      }
+    },
+    "total_matches": 8
+  }
+}
+```
+</ResponseExample>
+
+Query using a single function from an SMDA report. Useful for identifying individual function origins.
+
+---
+
+## Query by PicHash
+
+<ParamField path="pichash" type="string" required>
+  16-character hexadecimal PicHash value
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET https://your-mcrit-instance/query/pichash/a1b2c3d4e5f6a7b8
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": [
+    [42, 123, 9876, "decode_payload"],
+    [42, 124, 9999, "decrypt_data"],
+    [43, 125, 8765, "unpack_routine"]
+  ]
+}
+```
+</ResponseExample>
+
+Find all functions with an exact PicHash match. Returns an array of tuples: `[family_id, sample_id, function_id, function_name]`.
+
+<Note>PicHash is a position-independent code hash that identifies semantically identical functions regardless of their location in memory.</Note>
+
+---
+
+## Query PicHash Summary
+
+<ParamField path="pichash" type="string" required>
+  16-character hexadecimal PicHash value
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET https://your-mcrit-instance/query/pichash/a1b2c3d4e5f6a7b8/summary
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "families": 5,
+    "samples": 18,
+    "functions": 42
+  }
+}
+```
+</ResponseExample>
+
+Get aggregate statistics for a PicHash without retrieving all individual matches.
+
+---
+
+## Query by PicBlockHash
+
+<ParamField path="picblockhash" type="string" required>
+  16-character hexadecimal PicBlockHash value
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET https://your-mcrit-instance/query/picblockhash/b2c3d4e5f6a7b8c9
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": [
+    [42, 123, 9876, 4096],
+    [42, 123, 9876, 4352],
+    [42, 124, 9999, 8192]
+  ]
+}
+```
+</ResponseExample>
+
+Find all basic block occurrences with an exact PicBlockHash match. Returns an array of tuples: `[family_id, sample_id, function_id, block_offset]`.
+
+<Note>PicBlockHash identifies individual basic blocks at a granular level, useful for finding code fragment reuse.</Note>
+
+---
+
+## Query PicBlockHash Summary
+
+<ParamField path="picblockhash" type="string" required>
+  16-character hexadecimal PicBlockHash value
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET https://your-mcrit-instance/query/picblockhash/b2c3d4e5f6a7b8c9/summary
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "families": 3,
+    "samples": 8,
+    "functions": 12,
+    "offsets": 24
+  }
+}
+```
+</ResponseExample>
+
+Get aggregate statistics for a PicBlockHash. The `offsets` field indicates the total number of block occurrences.
+
+---
+
+## Query Workflow
+
+<Steps>
+  <Step title="Prepare Query">
+    Prepare your query data: SMDA report, binary file, or hash value
+  </Step>
+  
+  <Step title="Set Matching Parameters">
+    Choose appropriate `minhash_score` and other matching parameters based on your use case
+  </Step>
+  
+  <Step title="Submit Query">
+    POST the query to the appropriate endpoint
+  </Step>
+  
+  <Step title="Analyze Results">
+    Review matches to identify similarities and code reuse
+  </Step>
+</Steps>
+
+<Note>Query operations do not modify the database. To permanently store a sample, use the `/samples` endpoints instead.</Note>

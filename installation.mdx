@@ -1,0 +1,332 @@
+---
+title: Installation
+description: Complete installation guide for MCRIT
+---
+
+## Prerequisites
+
+Before installing MCRIT, ensure you have:
+
+- **Python 3.7+** with pip
+- **MongoDB 5.0** (for persistent storage)
+- **4GB+ RAM** recommended for processing large binaries
+- **Ubuntu/Linux** (recommended) or Windows
+
+<Note>
+For the following instructions, we assume Ubuntu as the host operating system. Adjustments may be needed for other platforms.
+</Note>
+
+## Installation Methods
+
+<CardGroup cols={2}>
+  <Card title="Docker (Recommended)" icon="docker">
+    Easiest setup with all components pre-configured
+  </Card>
+  
+  <Card title="Standalone" icon="server">
+    Manual installation for custom deployments
+  </Card>
+</CardGroup>
+
+---
+
+## Docker Installation
+
+<Warning>
+We highly recommend using the fully packaged [docker-mcrit](https://github.com/danielplohmann/docker-mcrit) for trivial deployment and usage.
+</Warning>
+
+The Docker installation provides:
+
+- ✅ Fully compatible versions across all components
+- ✅ Pre-configured MongoDB database for persistence
+- ✅ Web frontend for convenient interaction
+- ✅ Automatic service orchestration
+- ✅ No dependency conflicts
+
+Visit the **[docker-mcrit repository](https://github.com/danielplohmann/docker-mcrit)** for complete Docker setup instructions.
+
+---
+
+## Standalone Installation
+
+Installing MCRIT standalone requires a few more steps but provides more control over the deployment.
+
+### Step 1: Install Python Dependencies
+
+<Steps>
+  <Step title="Install Python and pip">
+    ```bash
+    sudo apt install python3 python3-pip
+    ```
+  </Step>
+
+  <Step title="Install MCRIT dependencies">
+    Install required Python packages from requirements.txt:
+    
+    ```bash
+    pip install -r requirements.txt
+    ```
+    
+    Key dependencies include:
+    - `falcon>=2.0.0` - Web framework for REST API
+    - `pymongo` - MongoDB driver
+    - `smda>=1.13.19` - SMDA disassembler
+    - `mmh3>=2.5.1` - MurmurHash3 for MinHash
+    - `numpy<2.0.0` - Numerical computing
+    - `lief>=0.16.0` - Binary parsing
+    - `picblocks>=1.1.2` - PIC block analysis
+    - Additional packages: `scipy`, `rapidfuzz`, `requests`, `tqdm`, `waitress`, `werkzeug`
+  </Step>
+
+  <Step title="Install MCRIT module (Optional)">
+    For development or editable installation from a cloned repository:
+    
+    ```bash
+    pip install -e .
+    ```
+    
+    This allows you to modify MCRIT source code and use changes immediately.
+  </Step>
+</Steps>
+
+### Step 2: Install MongoDB 5.0
+
+<Note>
+By default, MongoDB 5.0 is used as backend, which is the recommended mode of operation as it provides persistent data storage.
+</Note>
+
+<Steps>
+  <Step title="Install MongoDB signing key">
+    ```bash
+    sudo apt-get install gnupg
+    wget -qO - https://www.mongodb.org/static/pgp/server-5.0.asc | sudo apt-key add -
+    ```
+  </Step>
+
+  <Step title="Add MongoDB package repository">
+    Choose the command for your Ubuntu version:
+    
+    <CodeGroup>
+    ```bash Ubuntu 22.04
+    echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/5.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-5.0.list
+    ```
+    
+    ```bash Ubuntu 20.04
+    echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/5.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-5.0.list
+    ```
+    
+    ```bash Ubuntu 18.04
+    echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/5.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-5.0.list
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Install MongoDB">
+    ```bash
+    sudo apt-get update
+    sudo apt-get install -y mongodb-org
+    ```
+  </Step>
+
+  <Step title="Start MongoDB service">
+    ```bash
+    sudo systemctl start mongod
+    ```
+    
+    Verify MongoDB is running:
+    ```bash
+    sudo systemctl status mongod
+    ```
+  </Step>
+
+  <Step title="Enable automatic startup (Optional)">
+    Configure MongoDB to start automatically with system boot:
+    
+    ```bash
+    sudo systemctl enable mongod
+    ```
+  </Step>
+</Steps>
+
+### Step 3: Verify Installation
+
+Test your installation:
+
+```bash
+# Check MCRIT is installed
+mcrit --version
+
+# Verify MongoDB connection
+mongo --eval "db.version()"
+```
+
+<Note>
+After this initial installation, MCRIT can be used without an internet connection if desired.
+</Note>
+
+---
+
+## Operation
+
+MCRIT backend is divided into two components that run separately:
+
+### Starting the Server
+
+The server provides the REST API interface:
+
+```bash
+mcrit server
+```
+
+By default, the server listens on **[http://127.0.0.1:8000/](http://127.0.0.1:8000/)**.
+
+<Note>
+Keep this terminal open while using MCRIT.
+</Note>
+
+### Starting the Worker
+
+Workers process queued jobs for matching and analysis:
+
+```bash
+mcrit worker
+```
+
+<Note>
+You can start multiple workers in separate terminals for parallel processing.
+</Note>
+
+---
+
+## Configuration
+
+### MongoDB Connection
+
+The MongoDB connection is fully configurable. Configuration options can be set through:
+
+- Environment variables
+- Configuration files
+- Command-line parameters
+
+See the [Configuration Guide](/configuration/server) for details.
+
+### Server Configuration
+
+<CodeGroup>
+```bash Linux (default: gunicorn)
+# Linux deployments use gunicorn as WSGI server
+mcrit server
+```
+
+```bash Windows (default: waitress)
+# Windows deployments use waitress as WSGI server
+mcrit server
+```
+</CodeGroup>
+
+<Note>
+Linux deployments use `gunicorn` instead of `waitress` for much better performance. This is handled automatically based on your platform.
+</Note>
+
+---
+
+## Platform-Specific Notes
+
+### Linux
+
+- Recommended platform for production deployments
+- Uses `gunicorn` for optimal performance
+- Full MongoDB support
+
+### Windows
+
+- Fully supported with `waitress` as WSGI server
+- `gunicorn` is excluded from requirements on Windows
+- May require additional steps for MongoDB installation
+
+---
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="MongoDB connection refused">
+    Ensure MongoDB is running:
+    ```bash
+    sudo systemctl status mongod
+    sudo systemctl start mongod
+    ```
+  </Accordion>
+
+  <Accordion title="Port 8000 already in use">
+    Check if another service is using port 8000:
+    ```bash
+    sudo lsof -i :8000
+    ```
+    
+    You can configure MCRIT to use a different port in the configuration.
+  </Accordion>
+
+  <Accordion title="Import errors after installation">
+    Ensure all dependencies are installed:
+    ```bash
+    pip install -r requirements.txt
+    ```
+    
+    For editable install:
+    ```bash
+    pip install -e .
+    ```
+  </Accordion>
+
+  <Accordion title="Worker not processing jobs">
+    Verify:
+    1. MongoDB is running
+    2. Server is running and accessible
+    3. Worker has network access to server
+    4. Check worker logs for errors
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+    Learn how to use MCRIT with basic examples
+  </Card>
+  
+  <Card title="Configuration" icon="gear" href="/configuration/server">
+    Configure MCRIT for your environment
+  </Card>
+  
+  <Card title="CLI Reference" icon="terminal" href="/guides/cli-usage">
+    Explore command-line interface options
+  </Card>
+  
+  <Card title="API Reference" icon="code" href="/api/overview">
+    Start using the REST API
+  </Card>
+</CardGroup>
+
+---
+
+## System Requirements
+
+### Minimum Requirements
+- 2 CPU cores
+- 4GB RAM
+- 10GB disk space
+- MongoDB 5.0+
+
+### Recommended for Production
+- 4+ CPU cores
+- 16GB+ RAM
+- 100GB+ disk space (depending on dataset size)
+- SSD storage for MongoDB
+- Multiple worker instances
+
+<Warning>
+Processing large binaries or running cross-matching jobs on large datasets can be memory-intensive. Monitor system resources and adjust worker count accordingly.
+</Warning>

@@ -1,0 +1,233 @@
+---
+title: 'Family Methods'
+description: 'Methods for managing and querying malware families in MCRIT'
+---
+
+## Overview
+
+Family methods allow you to organize samples into families and manage family metadata. Families represent groups of related malware samples or software components.
+
+## Retrieve Families
+
+### getFamilies()
+
+Get all FamilyEntry objects in the MCRIT database.
+
+```python
+client.getFamilies() -> Optional[Dict[int, FamilyEntry]]
+```
+
+<ResponseField name="return" type="Dict[int, FamilyEntry]">
+  Dictionary mapping family IDs to FamilyEntry objects, or None if the request fails
+</ResponseField>
+
+**Example:**
+
+```python
+from mcrit.client.McritClient import McritClient
+
+client = McritClient(mcrit_server="http://localhost:8000")
+
+families = client.getFamilies()
+if families:
+    for family_id, family_entry in families.items():
+        print(f"Family {family_id}: {family_entry.family_name}")
+        print(f"  Samples: {len(family_entry.samples)}")
+        print(f"  Is library: {family_entry.is_library}")
+```
+
+### getFamily()
+
+Get a FamilyEntry by its family_id.
+
+```python
+client.getFamily(family_id: int, with_samples=True) -> Optional[FamilyEntry]
+```
+
+<ParamField path="family_id" type="int" required>
+  The ID of the family to retrieve
+</ParamField>
+
+<ParamField path="with_samples" type="bool" default="True">
+  Whether to include the list of samples belonging to this family
+</ParamField>
+
+<ResponseField name="return" type="FamilyEntry">
+  The family entry object, or None if not found
+</ResponseField>
+
+**Example:**
+
+```python
+# Get family with samples
+family = client.getFamily(5, with_samples=True)
+if family:
+    print(f"Family: {family.family_name}")
+    print(f"Number of samples: {len(family.samples)}")
+    for sample in family.samples:
+        print(f"  - {sample.filename} (ID: {sample.sample_id})")
+
+# Get family metadata only (without samples)
+family = client.getFamily(5, with_samples=False)
+if family:
+    print(f"Family: {family.family_name}")
+    print(f"Is library: {family.is_library}")
+```
+
+### getFamilyById()
+
+Alias for `getFamily()`. Get a FamilyEntry by its family_id.
+
+```python
+client.getFamilyById(family_id: int, with_samples=True) -> Optional[FamilyEntry]
+```
+
+This method is functionally identical to `getFamily()` and is provided for naming consistency.
+
+## Update Families
+
+### modifyFamily()
+
+Update metadata for an existing family.
+
+```python
+client.modifyFamily(family_id, family_name=None, is_library=None)
+```
+
+<ParamField path="family_id" type="int" required>
+  The family ID to update
+</ParamField>
+
+<ParamField path="family_name" type="str">
+  New name for the family
+</ParamField>
+
+<ParamField path="is_library" type="bool">
+  Whether this family represents library code
+</ParamField>
+
+**Example:**
+
+```python
+# Rename a family
+client.modifyFamily(
+    family_id=5,
+    family_name="Emotet_v2"
+)
+
+# Mark a family as library code
+client.modifyFamily(
+    family_id=10,
+    is_library=True
+)
+
+# Update both fields
+client.modifyFamily(
+    family_id=15,
+    family_name="openssl",
+    is_library=True
+)
+```
+
+### updateFamily()
+
+Alias for `modifyFamily()`. Update metadata for an existing family.
+
+```python
+client.updateFamily(family_id, family_name=None, is_library=None)
+```
+
+This method is functionally identical to `modifyFamily()` and is provided for naming consistency.
+
+## Delete Families
+
+### deleteFamily()
+
+Delete a family from MCRIT.
+
+```python
+client.deleteFamily(family_id, keep_samples=False)
+```
+
+<ParamField path="family_id" type="int" required>
+  The ID of the family to delete
+</ParamField>
+
+<ParamField path="keep_samples" type="bool" default="False">
+  If True, samples in this family will be preserved but unlinked from the family. If False, all samples in the family will also be deleted.
+</ParamField>
+
+**Example:**
+
+```python
+# Delete family and all its samples
+result = client.deleteFamily(5, keep_samples=False)
+if result:
+    print("Family and samples deleted")
+
+# Delete family but keep the samples
+result = client.deleteFamily(5, keep_samples=True)
+if result:
+    print("Family deleted, samples preserved")
+```
+
+<Warning>
+Deleting a family with `keep_samples=False` will permanently remove all samples belonging to that family. Use with caution.
+</Warning>
+
+## Check Family Existence
+
+### isFamilyId()
+
+Check if a family_id exists in MCRIT.
+
+```python
+client.isFamilyId(family_id) -> bool
+```
+
+<ParamField path="family_id" type="int" required>
+  The family ID to check
+</ParamField>
+
+<ResponseField name="return" type="bool">
+  True if the family exists, False otherwise
+</ResponseField>
+
+**Example:**
+
+```python
+if client.isFamilyId(5):
+    print("Family exists")
+    family = client.getFamily(5)
+else:
+    print("Family not found")
+```
+
+## Working with Family Data
+
+The `FamilyEntry` object contains the following key attributes:
+
+- `family_id`: Unique identifier for the family
+- `family_name`: Human-readable name
+- `is_library`: Boolean indicating if this is library code
+- `samples`: List of `SampleEntry` objects (when `with_samples=True`)
+
+**Example: Analyzing a family**
+
+```python
+family = client.getFamily(5, with_samples=True)
+
+if family:
+    print(f"Analyzing family: {family.family_name}")
+    print(f"Family ID: {family.family_id}")
+    print(f"Is library: {family.is_library}")
+    print(f"Total samples: {len(family.samples)}")
+    
+    # Analyze sample versions
+    versions = set()
+    for sample in family.samples:
+        if sample.version:
+            versions.add(sample.version)
+    
+    print(f"Versions found: {', '.join(sorted(versions))}")
+```

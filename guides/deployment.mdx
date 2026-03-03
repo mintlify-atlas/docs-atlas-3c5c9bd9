@@ -1,0 +1,185 @@
+---
+title: Standalone Deployment
+description: Deploy MCRIT server and workers with MongoDB for production use
+---
+
+MCRIT can be deployed as a standalone installation with separate server and worker components. This guide covers installing and running MCRIT with MongoDB persistence for production environments.
+
+## Prerequisites
+
+MCRIT requires Python 3 and MongoDB 5.0 for persistent data storage. The following steps assume Ubuntu as the host operating system.
+
+## Installation
+
+<Steps>
+  <Step title="Install Python and Dependencies">
+    Install Python 3 and the required Python packages:
+
+    ```bash
+    sudo apt install python3 python3-pip
+    pip install -r requirements.txt
+    ```
+  </Step>
+
+  <Step title="Install MongoDB 5.0">
+    MongoDB 5.0 is the recommended backend for persistent data storage.
+
+    ```bash
+    # Fetch MongoDB signing key
+    sudo apt-get install gnupg
+    wget -qO - https://www.mongodb.org/static/pgp/server-5.0.asc | sudo apt-key add -
+
+    # Add package repository (Ubuntu 22.04)
+    echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/5.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-5.0.list
+
+    # OR for Ubuntu 20.04
+    echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/5.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-5.0.list
+
+    # OR for Ubuntu 18.04
+    echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/5.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-5.0.list
+
+    # Install MongoDB
+    sudo apt-get update
+    sudo apt-get install -y mongodb-org
+    ```
+  </Step>
+
+  <Step title="Start MongoDB Service">
+    Start MongoDB and optionally enable it to start on system boot:
+
+    ```bash
+    # Start MongoDB service
+    sudo systemctl start mongod
+
+    # Enable MongoDB to start on boot
+    sudo systemctl enable mongod
+    ```
+  </Step>
+
+  <Step title="Install MCRIT Module">
+    For standalone installations, install MCRIT from the cloned repository:
+
+    ```bash
+    pip install -e .
+    ```
+
+    After installation, MCRIT can be used without an internet connection.
+  </Step>
+</Steps>
+
+## Running MCRIT
+
+The MCRIT backend consists of two components that run separately:
+
+### Server Component
+
+The server provides the REST API interface for interacting with MCRIT. Start it in a dedicated terminal:
+
+```bash
+mcrit server
+```
+
+By default, the server listens on `http://127.0.0.1:8000/`.
+
+<Note>
+  On Linux, MCRIT automatically uses Gunicorn if available for better performance. On Windows, it uses Waitress.
+</Note>
+
+### Worker Component
+
+Workers process queued jobs from the server. Start one or more workers in separate terminals:
+
+```bash
+mcrit worker
+```
+
+You can run multiple workers simultaneously to process jobs in parallel.
+
+## Server Options
+
+<CodeGroup>
+```bash Standard Server
+mcrit server
+```
+
+```bash Server with Profiling
+mcrit server --profile
+```
+
+```bash Force Gunicorn (Linux)
+mcrit server --gunicorn
+```
+</CodeGroup>
+
+The server component (`source/mcrit/__main__.py:24-73`) supports:
+- **Waitress**: Default WSGI server for Windows and fallback
+- **Gunicorn**: Automatically used on Linux for better performance
+- **Profiling**: Enable with `--profile` flag for performance analysis
+
+## Worker Types
+
+MCRIT provides multiple worker types for different use cases:
+
+<CodeGroup>
+```bash Standard Worker
+mcrit worker
+```
+
+```bash Spawning Worker
+mcrit spawningworker
+```
+
+```bash Single Job Worker
+mcrit singlejobworker --job_id <24-char-hex-id>
+```
+</CodeGroup>
+
+- **worker**: Standard worker that processes jobs from the queue
+- **spawningworker**: Spawns separate subprocesses for each job to reduce memory allocation issues
+- **singlejobworker**: Processes a single specific job by ID
+
+## MongoDB Configuration
+
+MCRIT's MongoDB connection is fully configurable. The connection can be customized through configuration files to support:
+
+- Remote MongoDB instances
+- Authentication credentials
+- Custom ports and connection parameters
+- Replica sets and sharding
+
+<Note>
+  Ensure MongoDB is properly secured in production environments with authentication enabled and network access restricted.
+</Note>
+
+## Production Considerations
+
+### System Resources
+
+- **Memory**: Workers can consume significant memory during matching operations. Monitor resource usage and adjust worker count accordingly.
+- **Storage**: MongoDB storage requirements grow with the number of samples and functions indexed.
+- **CPU**: Multiple workers benefit from multi-core systems for parallel job processing.
+
+### Service Management
+
+For production deployments, consider using systemd or supervisor to manage server and worker processes:
+
+- Automatic restart on failure
+- Log management and rotation
+- Resource limits and monitoring
+- Graceful shutdown handling
+
+### Scaling
+
+- Run multiple worker instances for parallel processing
+- Deploy workers on separate machines pointing to the same MongoDB instance
+- Use `spawningworker` type to reduce memory fragmentation
+- Monitor queue statistics to determine optimal worker count
+
+### Maintenance
+
+Regular maintenance tasks:
+
+- Monitor MongoDB disk usage and performance
+- Clean up old completed jobs
+- Rebuild indexes if database performance degrades
+- Backup MongoDB data regularly

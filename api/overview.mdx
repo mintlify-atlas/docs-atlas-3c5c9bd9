@@ -1,0 +1,157 @@
+---
+title: 'API Overview'
+description: 'Overview of the MCRIT REST API'
+---
+
+## Introduction
+
+MCRIT provides a comprehensive REST API built on the [Falcon framework](https://falcon.readthedocs.io/) for programmatic access to all functionality. The API enables you to submit binaries, query for matches, manage samples and families, and retrieve results.
+
+## Base URL
+
+The API server runs on `http://127.0.0.1:8000/` by default.
+
+You can configure the host and port when starting the MCRIT server.
+
+## Request/Response Format
+
+All API endpoints follow a consistent JSON format:
+
+**Successful Response:**
+```json
+{
+  "status": "successful",
+  "data": { ... }
+}
+```
+
+**Error Response:**
+```json
+{
+  "status": "failed",
+  "data": {
+    "message": "Error description"
+  }
+}
+```
+
+## Endpoint Categories
+
+The MCRIT API is organized into the following categories:
+
+### Status
+Server status, version, configuration, and administrative operations:
+- `GET /` - Welcome message
+- `GET /status` - Server status and statistics
+- `GET /version` - API version information
+- `GET /config` - Configuration details
+- `GET /export` - Export all data
+- `GET /export/{comma_separated_sample_ids}` - Export specific samples
+- `POST /import` - Import data into the system
+- `POST /respawn` - Reset the MCRIT instance
+- `GET /complete_minhashes` - Calculate missing minhashes
+- `GET /rebuild_index` - Rebuild the minhash index
+- `GET /recalculate_pichashes` - Recalculate PIC hashes
+- `GET /recalculate_minhashes` - Recalculate minhashes
+
+### Search
+Search across families, samples, and functions:
+- `GET /search/families` - Search families
+- `GET /search/samples` - Search samples
+- `GET /search/functions` - Search functions
+
+### Families
+Manage binary families:
+- `GET /families` - List all families
+- `GET /families/{family_id}` - Get family details
+- `PUT /families/{family_id}` - Update family (name, is_library)
+- `DELETE /families/{family_id}` - Delete all samples in family
+
+### Samples
+Manage individual binary samples:
+- `GET /samples` - List all samples
+- `POST /samples` - Submit a sample
+- `POST /samples/binary` - Submit a binary file
+- `GET /samples/{sample_id}` - Get sample details
+- `PUT /samples/{sample_id}` - Update sample metadata
+- `DELETE /samples/{sample_id}` - Delete a sample
+- `GET /samples/sha256/{sample_sha256}` - Get sample by SHA256
+- `GET /samples/{sample_id}/functions` - Get functions in sample
+- `GET /samples/{sample_id}/functions/{function_id}` - Get specific function
+
+### Functions
+Access function-level data:
+- `GET /functions` - List all functions
+- `GET /functions/{function_id}` - Get function details
+
+### Matches
+Query similarity matches:
+- `GET /matches/sample/{sample_id}` - Get matches for a sample
+- `GET /matches/sample/cross/{sample_ids}` - Cross-compare multiple samples
+- `GET /matches/sample/{sample_id}/{sample_id_b}` - Compare two samples
+- `GET /matches/function/{function_id}/{function_id_b}` - Compare two functions
+- `GET /matches/function/{function_id}` - Get matches for a function
+
+### Query
+Query the system with new binaries or hashes:
+- `POST /query` - Query with SMDA report
+- `POST /query/binary` - Query with binary file
+- `POST /query/binary/mapped/{base_address}` - Query with mapped binary
+- `POST /query/function` - Query with function data
+- `GET /query/pichash/{pichash}` - Query by PIC hash
+- `GET /query/pichash/{pichash}/summary` - Get PIC hash summary
+- `GET /query/picblockhash/{picblockhash}` - Query by PIC block hash
+- `GET /query/picblockhash/{picblockhash}/summary` - Get PIC block hash summary
+
+### Jobs
+Manage asynchronous jobs and results:
+- `GET /jobs` - List all jobs
+- `GET /jobs/stats` - Get job statistics
+- `GET /jobs/{job_id}` - Get job details
+- `GET /jobs/{job_id}/result` - Get job result
+- `GET /results/{result_id}` - Get result by ID
+- `GET /results/{result_id}/job` - Get job for a result
+
+### Blocks
+Analyze unique code blocks:
+- `GET /uniqueblocks/samples/{comma_separated_sample_ids}` - Get unique blocks for samples
+- `GET /uniqueblocks/family/{family_id}` - Get unique blocks for family
+
+## Example API Call
+
+Here's a simple example to check the server status:
+
+```bash
+curl http://127.0.0.1:8000/status
+```
+
+Response:
+```json
+{
+  "status": "successful",
+  "data": {
+    "num_samples": 42,
+    "num_families": 8,
+    "num_functions": 1523,
+    ...
+  }
+}
+```
+
+## HTTP Methods
+
+The API uses standard HTTP methods:
+- `GET` - Retrieve data
+- `POST` - Create new resources or query
+- `PUT` - Update existing resources
+- `DELETE` - Remove resources
+
+## URL Path Handling
+
+The API automatically strips trailing slashes from URLs, so both `/status` and `/status/` are equivalent.
+
+## Next Steps
+
+- Learn about [Authentication](/api/authentication) to secure your API
+- Explore individual endpoint categories in the API reference
+- Check out the client library for easier integration

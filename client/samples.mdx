@@ -1,0 +1,322 @@
+---
+title: 'Sample Methods'
+description: 'Methods for managing and querying samples in MCRIT'
+---
+
+## Overview
+
+Sample methods allow you to retrieve, add, update, and delete samples in MCRIT. Samples represent analyzed binary files that have been processed through SMDA (the Simple Multi-Dimensional Analyzer).
+
+## Retrieve Samples
+
+### getSamples()
+
+Get all SampleEntries, optionally with pagination.
+
+```python
+client.getSamples(start=0, limit=0)
+```
+
+<ParamField path="start" type="int" default="0">
+  Starting sample_id for pagination
+</ParamField>
+
+<ParamField path="limit" type="int" default="0">
+  Maximum number of samples to return (0 for no limit)
+</ParamField>
+
+<ResponseField name="return" type="Dict[int, SampleEntry]">
+  Dictionary mapping sample IDs to SampleEntry objects
+</ResponseField>
+
+**Example:**
+
+```python
+from mcrit.client.McritClient import McritClient
+
+client = McritClient(mcrit_server="http://localhost:8000")
+
+# Get all samples
+all_samples = client.getSamples()
+
+# Get first 100 samples
+samples = client.getSamples(start=0, limit=100)
+
+for sample_id, sample_entry in samples.items():
+    print(f"Sample {sample_id}: {sample_entry.filename}")
+```
+
+### getSampleById()
+
+Get a SampleEntry by its sample_id.
+
+```python
+client.getSampleById(sample_id)
+```
+
+<ParamField path="sample_id" type="int" required>
+  The ID of the sample to retrieve
+</ParamField>
+
+<ResponseField name="return" type="SampleEntry">
+  The sample entry object, or None if not found
+</ResponseField>
+
+**Example:**
+
+```python
+sample = client.getSampleById(123)
+if sample:
+    print(f"Sample: {sample.filename}")
+    print(f"SHA256: {sample.sha256}")
+    print(f"Family: {sample.family}")
+```
+
+### getSampleBySha256()
+
+Get a SampleEntry by its SHA256 hash.
+
+```python
+client.getSampleBySha256(sample_sha256)
+```
+
+<ParamField path="sample_sha256" type="str" required>
+  The SHA256 hash of the sample
+</ParamField>
+
+<ResponseField name="return" type="SampleEntry">
+  The sample entry object, or None if not found
+</ResponseField>
+
+**Example:**
+
+```python
+sha256 = "a1b2c3d4e5f6..."
+sample = client.getSampleBySha256(sha256)
+if sample:
+    print(f"Found sample ID: {sample.sample_id}")
+```
+
+### getSamplesByFamilyId()
+
+Get all samples belonging to a specific family.
+
+```python
+client.getSamplesByFamilyId(family_id)
+```
+
+<ParamField path="family_id" type="int" required>
+  The family ID to query
+</ParamField>
+
+<ResponseField name="return" type="List[SampleEntry]">
+  List of sample entries belonging to the family
+</ResponseField>
+
+**Example:**
+
+```python
+samples = client.getSamplesByFamilyId(5)
+for sample in samples:
+    print(f"Sample: {sample.filename} (ID: {sample.sample_id})")
+```
+
+## Add Samples
+
+### addReport()
+
+Add a sample to MCRIT using an SMDA report.
+
+```python
+client.addReport(smda_report: SmdaReport) -> Tuple[SampleEntry, Optional[str]]
+```
+
+<ParamField path="smda_report" type="SmdaReport" required>
+  An SMDA report object containing the disassembled binary analysis
+</ParamField>
+
+<ResponseField name="return" type="Tuple[SampleEntry, Optional[str]]">
+  Returns a tuple of (SampleEntry, job_id). The job_id can be used to track processing status.
+</ResponseField>
+
+**Example:**
+
+```python
+from smda.Disassembler import Disassembler
+
+# Create SMDA report
+disassembler = Disassembler()
+with open("malware.exe", "rb") as f:
+    binary = f.read()
+    
+report = disassembler.disassembleBuffer(binary)
+
+# Add to MCRIT
+sample_entry, job_id = client.addReport(report)
+print(f"Added sample {sample_entry.sample_id}")
+
+if job_id:
+    # Wait for processing to complete
+    result = client.awaitResult(job_id)
+    print(f"Processing complete: {result}")
+```
+
+### addBinarySample()
+
+Add a binary sample directly to MCRIT (server will disassemble it).
+
+```python
+client.addBinarySample(
+    binary: bytes,
+    filename=None,
+    family=None,
+    version=None,
+    is_dump=False,
+    base_addr=None,
+    bitness=None
+) -> Tuple[SampleEntry, Optional[str]]
+```
+
+<ParamField path="binary" type="bytes" required>
+  The raw binary data
+</ParamField>
+
+<ParamField path="filename" type="str">
+  Filename for the sample
+</ParamField>
+
+<ParamField path="family" type="str">
+  Malware family name
+</ParamField>
+
+<ParamField path="version" type="str">
+  Version string
+</ParamField>
+
+<ParamField path="is_dump" type="bool" default="False">
+  Whether the binary is a memory dump
+</ParamField>
+
+<ParamField path="base_addr" type="int">
+  Base address for memory dumps
+</ParamField>
+
+<ParamField path="bitness" type="int">
+  Architecture bitness (32 or 64)
+</ParamField>
+
+<ResponseField name="return" type="Tuple[SampleEntry, Optional[str]]">
+  Returns a tuple of (SampleEntry, job_id)
+</ResponseField>
+
+**Example:**
+
+```python
+with open("malware.exe", "rb") as f:
+    binary = f.read()
+
+sample_entry, job_id = client.addBinarySample(
+    binary,
+    filename="malware.exe",
+    family="emotet",
+    version="2023-01",
+    bitness=32
+)
+
+print(f"Sample ID: {sample_entry.sample_id}")
+```
+
+## Update Samples
+
+### modifySample()
+
+Update metadata for an existing sample.
+
+```python
+client.modifySample(
+    sample_id,
+    family_name=None,
+    version=None,
+    component=None,
+    is_library=None
+)
+```
+
+<ParamField path="sample_id" type="int" required>
+  The sample ID to update
+</ParamField>
+
+<ParamField path="family_name" type="str">
+  New family name
+</ParamField>
+
+<ParamField path="version" type="str">
+  New version string
+</ParamField>
+
+<ParamField path="component" type="str">
+  Component identifier
+</ParamField>
+
+<ParamField path="is_library" type="bool">
+  Mark as library code
+</ParamField>
+
+**Example:**
+
+```python
+client.modifySample(
+    sample_id=123,
+    family_name="emotet",
+    version="2023-02"
+)
+```
+
+## Delete Samples
+
+### deleteSample()
+
+Delete a sample from MCRIT.
+
+```python
+client.deleteSample(sample_id)
+```
+
+<ParamField path="sample_id" type="int" required>
+  The ID of the sample to delete
+</ParamField>
+
+**Example:**
+
+```python
+result = client.deleteSample(123)
+if result:
+    print("Sample deleted successfully")
+```
+
+## Check Sample Existence
+
+### isSampleId()
+
+Check if a sample_id exists in MCRIT.
+
+```python
+client.isSampleId(sample_id)
+```
+
+<ParamField path="sample_id" type="int" required>
+  The sample ID to check
+</ParamField>
+
+<ResponseField name="return" type="bool">
+  True if the sample exists, False otherwise
+</ResponseField>
+
+**Example:**
+
+```python
+if client.isSampleId(123):
+    print("Sample exists")
+else:
+    print("Sample not found")
+```

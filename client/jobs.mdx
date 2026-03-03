@@ -1,0 +1,468 @@
+---
+title: 'Job Methods'
+description: 'Methods for managing and tracking asynchronous jobs in MCRIT'
+---
+
+## Overview
+
+MCRIT processes many operations asynchronously using a job queue. Job methods allow you to monitor, retrieve results from, and manage these background tasks.
+
+## Retrieve Job Information
+
+### getJob()
+
+Get the Job object for a specific job ID (alias for `getJobData`).
+
+```python
+client.getJob(job_id) -> Job
+```
+
+<ParamField path="job_id" type="str" required>
+  The job ID to retrieve
+</ParamField>
+
+<ResponseField name="return" type="Job">
+  Job object containing job metadata and status
+</ResponseField>
+
+**Example:**
+
+```python
+from mcrit.client.McritClient import McritClient
+
+client = McritClient(mcrit_server="http://localhost:8000")
+
+# Get job information
+job = client.getJob("job-12345-abcde")
+
+if job:
+    print(f"Job ID: {job.job_id}")
+    print(f"State: {job.state}")
+    print(f"Progress: {job.progress}%")
+    print(f"Created: {job.created_at}")
+    print(f"Finished: {job.finished_at}")
+    print(f"Is terminated: {job.is_terminated}")
+    print(f"Is failed: {job.is_failed}")
+```
+
+### getJobData()
+
+Get the Job object for a specific job ID.
+
+```python
+client.getJobData(job_id) -> Job
+```
+
+This is the underlying method called by `getJob()`.
+
+### getJobs()
+
+Get multiple jobs with optional filtering (alias for `getQueueData`).
+
+```python
+client.getJobs(
+    start=0,
+    limit=0,
+    method=None,
+    filter=None,
+    state=None,
+    ascending=False
+) -> List[Job]
+```
+
+<ParamField path="start" type="int" default="0">
+  Starting position for pagination
+</ParamField>
+
+<ParamField path="limit" type="int" default="0">
+  Maximum number of jobs to return (0 for no limit)
+</ParamField>
+
+<ParamField path="method" type="str">
+  Filter by method name (e.g., "matchSample", "addReport")
+</ParamField>
+
+<ParamField path="filter" type="str">
+  Additional filter criteria
+</ParamField>
+
+<ParamField path="state" type="str">
+  Filter by job state (e.g., "finished", "running", "failed")
+</ParamField>
+
+<ParamField path="ascending" type="bool" default="False">
+  Sort in ascending order (oldest first)
+</ParamField>
+
+<ResponseField name="return" type="List[Job]">
+  List of Job objects
+</ResponseField>
+
+**Example:**
+
+```python
+# Get all jobs
+all_jobs = client.getJobs()
+print(f"Total jobs: {len(all_jobs)}")
+
+# Get last 50 jobs
+recent_jobs = client.getJobs(limit=50)
+
+# Get only matching jobs
+matching_jobs = client.getJobs(method="matchSample")
+
+# Get failed jobs
+failed_jobs = client.getJobs(state="failed")
+for job in failed_jobs:
+    print(f"Failed job {job.job_id}: {job.error}")
+
+# Get jobs with pagination
+page_1 = client.getJobs(start=0, limit=100)
+page_2 = client.getJobs(start=100, limit=100)
+```
+
+### getQueueData()
+
+Get queue data with filtering options.
+
+```python
+client.getQueueData(
+    start=0,
+    limit=0,
+    method=None,
+    filter=None,
+    state=None,
+    ascending=False
+) -> List[Job]
+```
+
+This is the underlying method called by `getJobs()`.
+
+## Retrieve Job Results
+
+### getJobResult()
+
+Get the result for a completed job (alias for `getResultForJob`).
+
+```python
+client.getJobResult(job_id, compact=False)
+```
+
+<ParamField path="job_id" type="str" required>
+  The job ID whose result to retrieve
+</ParamField>
+
+<ParamField path="compact" type="bool" default="False">
+  Return compact result format (less detailed)
+</ParamField>
+
+<ResponseField name="return" type="dict">
+  The job result data, or None if not available
+</ResponseField>
+
+**Example:**
+
+```python
+job_id = "job-12345-abcde"
+
+# Get full result
+result = client.getJobResult(job_id)
+if result:
+    print(f"Matches found: {len(result['matches'])}")
+
+# Get compact result (less data transfer)
+compact_result = client.getJobResult(job_id, compact=True)
+```
+
+### getResultForJob()
+
+Get the result for a given job ID.
+
+```python
+client.getResultForJob(job_id, compact=False)
+```
+
+This is the underlying method called by `getJobResult()`.
+
+### getResult()
+
+Get a result by its result ID (not job ID).
+
+```python
+client.getResult(result_id, compact=False)
+```
+
+<ParamField path="result_id" type="str" required>
+  The result ID to retrieve
+</ParamField>
+
+<ParamField path="compact" type="bool" default="False">
+  Return compact format
+</ParamField>
+
+**Example:**
+
+```python
+result = client.getResult("result-12345-abcde")
+```
+
+### getJobForResult()
+
+Get the Job object associated with a result ID.
+
+```python
+client.getJobForResult(result_id) -> Job
+```
+
+<ParamField path="result_id" type="str" required>
+  The result ID
+</ParamField>
+
+**Example:**
+
+```python
+job = client.getJobForResult("result-12345-abcde")
+if job:
+    print(f"Job ID: {job.job_id}")
+    print(f"Created: {job.created_at}")
+```
+
+## Wait for Job Completion
+
+### awaitResult()
+
+Wait for a job to complete and return its result.
+
+```python
+client.awaitResult(job_id, sleep_time=2, compact=False)
+```
+
+<ParamField path="job_id" type="str" required>
+  The job ID to wait for (can be None, in which case None is returned)
+</ParamField>
+
+<ParamField path="sleep_time" type="int" default="2">
+  Seconds to wait between polling attempts
+</ParamField>
+
+<ParamField path="compact" type="bool" default="False">
+  Return compact result format
+</ParamField>
+
+<ResponseField name="return" type="dict">
+  The job result when complete, or None if job_id is None
+</ResponseField>
+
+**Example:**
+
+```python
+from mcrit.client.McritClient import McritClient, JobTerminatedError
+
+client = McritClient(mcrit_server="http://localhost:8000")
+
+# Request a matching operation
+job_id = client.requestMatchesForSample(sample_id=123)
+
+print(f"Job started: {job_id}")
+
+# Wait for completion (default: poll every 2 seconds)
+try:
+    result = client.awaitResult(job_id)
+    print("Job completed successfully")
+    print(f"Matches: {len(result['matches'])}")
+except JobTerminatedError:
+    print("Job was terminated before completion")
+
+# Custom polling interval
+result = client.awaitResult(job_id, sleep_time=5)
+
+# Get compact result
+result = client.awaitResult(job_id, compact=True)
+```
+
+**Example: Monitoring job progress**
+
+```python
+import time
+
+job_id = client.requestMatchesForSample(123)
+
+# Monitor progress manually
+while True:
+    job = client.getJob(job_id)
+    
+    if job.is_failed:
+        print(f"Job failed: {job.error}")
+        break
+    
+    if job.is_terminated:
+        print("Job was terminated")
+        break
+    
+    if job.result:
+        print("Job completed!")
+        result = client.getJobResult(job_id)
+        break
+    
+    print(f"Progress: {job.progress}% - {job.state}")
+    time.sleep(3)
+```
+
+## Delete Jobs
+
+### deleteJob()
+
+Delete a specific job.
+
+```python
+client.deleteJob(job_id)
+```
+
+<ParamField path="job_id" type="str" required>
+  The job ID to delete
+</ParamField>
+
+**Example:**
+
+```python
+result = client.deleteJob("job-12345-abcde")
+if result:
+    print("Job deleted successfully")
+```
+
+### deleteQueueData()
+
+Delete multiple jobs matching criteria.
+
+```python
+client.deleteQueueData(
+    method=None,
+    created_before=None,
+    finished_before=None
+)
+```
+
+<ParamField path="method" type="str">
+  Delete jobs with this method name
+</ParamField>
+
+<ParamField path="created_before" type="datetime">
+  Delete jobs created before this timestamp
+</ParamField>
+
+<ParamField path="finished_before" type="datetime">
+  Delete jobs finished before this timestamp
+</ParamField>
+
+**Example:**
+
+```python
+import datetime
+
+# Delete all matching jobs
+client.deleteQueueData(method="matchSample")
+
+# Delete old jobs (older than 30 days)
+thirty_days_ago = datetime.datetime.now() - datetime.timedelta(days=30)
+client.deleteQueueData(finished_before=thirty_days_ago)
+
+# Delete jobs matching multiple criteria
+one_week_ago = datetime.datetime.now() - datetime.timedelta(days=7)
+client.deleteQueueData(
+    method="addReport",
+    finished_before=one_week_ago
+)
+```
+
+## Queue Statistics
+
+### getQueueStatistics()
+
+Get summary statistics about the job queue.
+
+```python
+client.getQueueStatistics(with_refresh=False)
+```
+
+<ParamField path="with_refresh" type="bool" default="False">
+  Refresh statistics before returning
+</ParamField>
+
+**Example:**
+
+```python
+stats = client.getQueueStatistics(with_refresh=True)
+
+if stats:
+    print(f"Total jobs: {stats['total']}")
+    print(f"Running: {stats['running']}")
+    print(f"Queued: {stats['queued']}")
+    print(f"Finished: {stats['finished']}")
+    print(f"Failed: {stats['failed']}")
+```
+
+### getJobCount()
+
+Get the count of jobs, optionally filtered.
+
+```python
+client.getJobCount(filter=None) -> int
+```
+
+<ParamField path="filter" type="str">
+  Filter criteria
+</ParamField>
+
+**Example:**
+
+```python
+total = client.getJobCount()
+print(f"Total jobs: {total}")
+
+filtered = client.getJobCount(filter="state:running")
+print(f"Running jobs: {filtered}")
+```
+
+## Job Object Structure
+
+The `Job` object contains the following attributes:
+
+- `job_id`: Unique job identifier
+- `state`: Current job state ("queued", "running", "finished", "failed", "terminated")
+- `progress`: Percentage complete (0-100)
+- `created_at`: Timestamp when job was created
+- `started_at`: Timestamp when job started running
+- `finished_at`: Timestamp when job completed
+- `result`: Result ID (available when job is finished)
+- `is_terminated`: Boolean indicating if job was terminated
+- `is_failed`: Boolean indicating if job failed
+- `error`: Error message (if job failed)
+- `method`: The method being executed
+
+**Example: Job lifecycle**
+
+```python
+# Create a job
+job_id = client.requestMatchesForSample(123)
+
+# Check immediate state (usually "queued")
+job = client.getJob(job_id)
+print(f"Initial state: {job.state}")  # "queued"
+
+# Wait a moment
+import time
+time.sleep(5)
+
+# Check again (might be "running")
+job = client.getJob(job_id)
+print(f"Current state: {job.state}")  # "running"
+print(f"Progress: {job.progress}%")
+
+# Wait for completion
+result = client.awaitResult(job_id)
+
+# Check final state
+job = client.getJob(job_id)
+print(f"Final state: {job.state}")  # "finished"
+print(f"Result ID: {job.result}")
+```

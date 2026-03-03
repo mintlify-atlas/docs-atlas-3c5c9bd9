@@ -1,0 +1,396 @@
+---
+title: 'Query Methods'
+description: 'Methods for querying MCRIT with binaries and functions without adding them permanently'
+---
+
+## Overview
+
+Query methods allow you to match samples and functions against the MCRIT database without permanently adding them. This is useful for one-time analysis or when you want to check if code is similar to known samples.
+
+## Binary Query Methods
+
+### getMatchesForUnmappedBinary()
+
+Match an unmapped binary (PE, ELF, etc.) against the MCRIT database.
+
+```python
+client.getMatchesForUnmappedBinary(
+    binary: bytes,
+    minhash_threshold=None,
+    pichash_size=None,
+    band_matches_required=None,
+    disassemble_locally=True,
+    force_recalculation=False
+) -> str
+```
+
+<ParamField path="binary" type="bytes" required>
+  Raw binary data to analyze
+</ParamField>
+
+<ParamField path="minhash_threshold" type="float">
+  Minimum MinHash similarity score (0.0 to 1.0)
+</ParamField>
+
+<ParamField path="pichash_size" type="int">
+  PicHash size for matching
+</ParamField>
+
+<ParamField path="band_matches_required" type="int">
+  Minimum LSH band matches required
+</ParamField>
+
+<ParamField path="disassemble_locally" type="bool" default="True">
+  If True, disassemble using local SMDA. If False, send binary to server for disassembly.
+</ParamField>
+
+<ParamField path="force_recalculation" type="bool" default="False">
+  Force recalculation of matches
+</ParamField>
+
+<ResponseField name="return" type="str">
+  Job ID for tracking results, or None if disassembly fails
+</ResponseField>
+
+**Example:**
+
+```python
+from mcrit.client.McritClient import McritClient
+
+client = McritClient(mcrit_server="http://localhost:8000")
+
+# Load binary
+with open("unknown_sample.exe", "rb") as f:
+    binary = f.read()
+
+# Query MCRIT
+job_id = client.getMatchesForUnmappedBinary(
+    binary=binary,
+    minhash_threshold=0.7,
+    disassemble_locally=True
+)
+
+if job_id:
+    # Wait for results
+    result = client.awaitResult(job_id)
+    
+    print(f"Found {len(result['matches'])} matches")
+    for match in result['matches']:
+        sample = client.getSampleById(match['sample_id'])
+        print(f"Match: {sample.filename} (score: {match['score']:.2%})")
+else:
+    print("Failed to disassemble binary")
+```
+
+### getMatchesForMappedBinary()
+
+Match a memory dump or mapped binary with a known base address.
+
+```python
+client.getMatchesForMappedBinary(
+    binary: bytes,
+    base_address: int,
+    minhash_threshold=None,
+    pichash_size=None,
+    band_matches_required=None,
+    disassemble_locally=True,
+    force_recalculation=False
+) -> str
+```
+
+<ParamField path="binary" type="bytes" required>
+  Raw binary data (memory dump)
+</ParamField>
+
+<ParamField path="base_address" type="int" required>
+  Base address where the binary is loaded in memory
+</ParamField>
+
+<ParamField path="minhash_threshold" type="float">
+  Minimum MinHash similarity score
+</ParamField>
+
+<ParamField path="pichash_size" type="int">
+  PicHash size for matching
+</ParamField>
+
+<ParamField path="band_matches_required" type="int">
+  Minimum LSH band matches required
+</ParamField>
+
+<ParamField path="disassemble_locally" type="bool" default="True">
+  Disassemble locally or on server
+</ParamField>
+
+<ParamField path="force_recalculation" type="bool" default="False">
+  Force recalculation of matches
+</ParamField>
+
+<ResponseField name="return" type="str">
+  Job ID for tracking results
+</ResponseField>
+
+**Example:**
+
+```python
+# Load memory dump
+with open("memory_dump.bin", "rb") as f:
+    binary = f.read()
+
+# Query with base address
+base_addr = 0x400000
+job_id = client.getMatchesForMappedBinary(
+    binary=binary,
+    base_address=base_addr,
+    minhash_threshold=0.75
+)
+
+result = client.awaitResult(job_id)
+print(f"Matches found: {len(result['matches'])}")
+```
+
+## SMDA Report Query
+
+### getMatchesForSmdaReport()
+
+Match an SMDA report against the database (alias for `requestMatchesForSmdaReport`).
+
+```python
+client.getMatchesForSmdaReport(
+    smda_report: SmdaReport,
+    minhash_threshold=None,
+    pichash_size=None,
+    band_matches_required=None,
+    force_recalculation=False
+) -> str
+```
+
+<ParamField path="smda_report" type="SmdaReport" required>
+  SMDA report object to match
+</ParamField>
+
+**Example:**
+
+```python
+from smda.Disassembler import Disassembler
+
+# Create SMDA report
+disassembler = Disassembler()
+with open("sample.exe", "rb") as f:
+    binary = f.read()
+
+report = disassembler.disassembleBuffer(binary)
+
+# Query MCRIT
+job_id = client.getMatchesForSmdaReport(
+    smda_report=report,
+    minhash_threshold=0.8
+)
+
+result = client.awaitResult(job_id)
+print(f"Total matches: {len(result['matches'])}")
+```
+
+### requestMatchesForSmdaReport()
+
+Request matches for an SMDA report.
+
+```python
+client.requestMatchesForSmdaReport(
+    smda_report: SmdaReport,
+    minhash_threshold=None,
+    pichash_size=None,
+    band_matches_required=None,
+    force_recalculation=False
+) -> str
+```
+
+This is the underlying method called by `getMatchesForSmdaReport()`.
+
+## Function Query
+
+### getMatchesForSmdaFunction()
+
+Match a single function against the MCRIT database.
+
+```python
+client.getMatchesForSmdaFunction(
+    smda_report,
+    minhash_threshold=None,
+    pichash_size=None,
+    force_recalculation=None,
+    band_matches_required=None,
+    exclude_self_matches=False
+)
+```
+
+<ParamField path="smda_report" type="SmdaReport" required>
+  SMDA report containing a single function
+</ParamField>
+
+<ParamField path="minhash_threshold" type="float">
+  Minimum similarity threshold
+</ParamField>
+
+<ParamField path="pichash_size" type="int">
+  PicHash size
+</ParamField>
+
+<ParamField path="force_recalculation" type="bool">
+  Force recalculation
+</ParamField>
+
+<ParamField path="band_matches_required" type="int">
+  Minimum band matches
+</ParamField>
+
+<ParamField path="exclude_self_matches" type="bool" default="False">
+  Exclude matches to the same sample
+</ParamField>
+
+**Example:**
+
+```python
+from smda.common.SmdaReport import SmdaReport
+from smda.common.SmdaFunction import SmdaFunction
+
+# Create a report with a single function
+# (Assuming you've extracted function data somehow)
+function = SmdaFunction(...)  # Your function data
+report = SmdaReport()
+report.addFunction(function)
+
+# Query for matches
+matches = client.getMatchesForSmdaFunction(
+    smda_report=report,
+    minhash_threshold=0.9,
+    exclude_self_matches=True
+)
+
+if matches:
+    print(f"Found {len(matches)} similar functions")
+    for match in matches:
+        print(f"Function {match['function_id']}: {match['score']:.2%} similar")
+```
+
+## PicHash Query
+
+### getPicHashMatchesForSample()
+
+Get PicHash matches for a specific sample.
+
+```python
+matches = client.getMatchesForPicHash(pichash, summary=False)
+```
+
+<ParamField path="pichash" type="int" required>
+  The PicHash value to query
+</ParamField>
+
+<ParamField path="summary" type="bool" default="False">
+  Return summary format only
+</ParamField>
+
+**Example:**
+
+```python
+# Get matches for a specific PicHash
+pichash = 0x1234567890abcdef
+matches = client.getMatchesForPicHash(pichash)
+
+if matches:
+    print(f"Found {len(matches)} functions with this PicHash")
+
+# Get summary only
+summary = client.getMatchesForPicHash(pichash, summary=True)
+print(f"Summary: {summary}")
+```
+
+### getMatchesForPicBlockHash()
+
+Get matches for a PicBlockHash.
+
+```python
+client.getMatchesForPicBlockHash(picblockhash, summary=False)
+```
+
+<ParamField path="picblockhash" type="int" required>
+  The PicBlockHash value to query
+</ParamField>
+
+<ParamField path="summary" type="bool" default="False">
+  Return summary format only
+</ParamField>
+
+**Example:**
+
+```python
+picblockhash = 0xabcdef1234567890
+matches = client.getMatchesForPicBlockHash(picblockhash)
+
+for match in matches:
+    print(f"Function {match['function_id']} in sample {match['sample_id']}")
+```
+
+## Complete Query Workflow
+
+**Example: Analyzing an unknown binary**
+
+```python
+from mcrit.client.McritClient import McritClient
+
+client = McritClient(mcrit_server="http://localhost:8000")
+
+# Step 1: Load unknown binary
+with open("unknown_malware.exe", "rb") as f:
+    binary = f.read()
+
+print("Analyzing unknown binary...")
+
+# Step 2: Query MCRIT
+job_id = client.getMatchesForUnmappedBinary(
+    binary=binary,
+    minhash_threshold=0.7,
+    disassemble_locally=True
+)
+
+if not job_id:
+    print("Failed to disassemble binary")
+    exit(1)
+
+print(f"Job submitted: {job_id}")
+
+# Step 3: Wait for results
+print("Waiting for matching results...")
+result = client.awaitResult(job_id, sleep_time=2)
+
+# Step 4: Analyze matches
+matches = result.get('matches', [])
+print(f"\nFound {len(matches)} matching samples")
+
+if matches:
+    # Sort by similarity score
+    sorted_matches = sorted(matches, key=lambda m: m['score'], reverse=True)
+    
+    print("\nTop 5 matches:")
+    for i, match in enumerate(sorted_matches[:5], 1):
+        sample = client.getSampleById(match['sample_id'])
+        print(f"{i}. {sample.filename}")
+        print(f"   Family: {sample.family}")
+        print(f"   Similarity: {match['score']:.2%}")
+        print(f"   Matched functions: {len(match['function_matches'])}")
+        print()
+    
+    # Analyze family distribution
+    families = {}
+    for match in matches:
+        sample = client.getSampleById(match['sample_id'])
+        family = sample.family or "Unknown"
+        families[family] = families.get(family, 0) + 1
+    
+    print("\nFamily distribution:")
+    for family, count in sorted(families.items(), key=lambda x: x[1], reverse=True):
+        print(f"  {family}: {count} samples")
+else:
+    print("No matches found")
+```

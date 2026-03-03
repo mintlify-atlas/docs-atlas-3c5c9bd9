@@ -1,0 +1,197 @@
+---
+title: 'Families'
+description: 'Manage malware families'
+---
+
+## Overview
+
+Family endpoints allow you to organize samples into malware families, retrieve family information, and manage family metadata.
+
+---
+
+## List Families
+
+<ParamField query="start" type="integer" default="0">
+  Starting index for pagination
+</ParamField>
+
+<ParamField query="limit" type="integer" default="0">
+  Maximum number of families to return (0 = no limit)
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://your-mcrit-instance/families?start=0&limit=50"
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "42": {
+      "family_id": 42,
+      "family_name": "malware_family_1",
+      "is_library": false,
+      "sample_count": 15,
+      "function_count": 1234
+    },
+    "43": {
+      "family_id": 43,
+      "family_name": "library_family",
+      "is_library": true,
+      "sample_count": 3,
+      "function_count": 456
+    }
+  }
+}
+```
+</ResponseExample>
+
+Returns a dictionary of families keyed by family ID.
+
+---
+
+## Get Family
+
+<ParamField path="family_id" type="integer" required>
+  Unique identifier of the family
+</ParamField>
+
+<ParamField query="with_samples" type="boolean" default="true">
+  Include detailed sample information in the response
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://your-mcrit-instance/families/42?with_samples=true"
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "family_id": 42,
+    "family_name": "malware_family_1",
+    "is_library": false,
+    "sample_count": 15,
+    "function_count": 1234,
+    "samples": {
+      "123": {
+        "sample_id": 123,
+        "sha256": "abc123...",
+        "version": "1.0",
+        "function_count": 98
+      },
+      "124": {...}
+    }
+  }
+}
+```
+</ResponseExample>
+
+<ResponseField name="family_id" type="integer">
+  Unique identifier for the family
+</ResponseField>
+
+<ResponseField name="family_name" type="string">
+  Name of the malware family
+</ResponseField>
+
+<ResponseField name="is_library" type="boolean">
+  Whether this family represents a library
+</ResponseField>
+
+<ResponseField name="sample_count" type="integer">
+  Number of samples in this family
+</ResponseField>
+
+<ResponseField name="function_count" type="integer">
+  Total number of functions across all samples
+</ResponseField>
+
+<ResponseField name="samples" type="object">
+  Dictionary of samples (only included when with_samples=true)
+</ResponseField>
+
+Returns 404 if the family ID doesn't exist.
+
+---
+
+## Update Family
+
+<ParamField path="family_id" type="integer" required>
+  Family ID to update
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X PUT https://your-mcrit-instance/families/42 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "family_name": "updated_family_name",
+    "is_library": true
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "message": "Family modified."
+  }
+}
+```
+</ResponseExample>
+
+<ParamField body="family_name" type="string">
+  New family name (0-64 alphanumeric chars with single dots, dashes, underscores inbetween)
+</ParamField>
+
+<ParamField body="is_library" type="boolean">
+  Update library status
+</ParamField>
+
+Modifying family metadata triggers index recalculation. Returns HTTP 202 on success.
+
+<Note>Family name validation: must be 0-64 alphanumeric characters with single dots, dashes, or underscores between characters (no consecutive special chars, no leading/trailing special chars).</Note>
+
+---
+
+## Delete Family
+
+<ParamField path="family_id" type="integer" required>
+  Family ID to delete
+</ParamField>
+
+<ParamField query="keep_samples" type="boolean" default="false">
+  If true, only delete the family and unassign samples; if false, delete samples too
+</ParamField>
+
+<RequestExample>
+```bash cURL
+# Delete family and all its samples
+curl -X DELETE https://your-mcrit-instance/families/42
+
+# Delete family but keep samples (unassign them)
+curl -X DELETE "https://your-mcrit-instance/families/42?keep_samples=true"
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": true
+}
+```
+</ResponseExample>
+
+Deletes a family and optionally its associated samples. Returns HTTP 202 on success.
+
+<Warning>By default, deleting a family also deletes all samples in that family. Use `keep_samples=true` to preserve samples.</Warning>

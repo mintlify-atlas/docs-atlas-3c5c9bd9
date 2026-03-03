@@ -1,0 +1,210 @@
+---
+title: 'Blocks'
+description: 'Analyze unique code blocks'
+---
+
+## Overview
+
+Blocks endpoints identify unique code blocks within samples or families. This analysis helps identify distinctive code patterns that differentiate malware families.
+
+---
+
+## What are Unique Blocks?
+
+Unique blocks are basic blocks (contiguous sequences of instructions) that appear exclusively in a specific set of samples and not in the broader database. This analysis is useful for:
+
+- Identifying family-specific code patterns
+- Finding distinctive malware signatures
+- Detecting code that differentiates variants
+- Creating targeted detection rules
+
+---
+
+## Get Unique Blocks for Samples
+
+<ParamField path="comma_separated_sample_ids" type="string" required>
+  Comma-separated list of sample IDs (e.g., "123,124,125")
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET https://your-mcrit-instance/uniqueblocks/samples/123,124,125
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "sample_ids": [123, 124, 125],
+    "total_blocks": 4567,
+    "unique_blocks": 342,
+    "uniqueness_ratio": 0.075,
+    "blocks": {
+      "a1b2c3d4e5f6a7b8": {
+        "picblockhash": "a1b2c3d4e5f6a7b8",
+        "occurrences": 3,
+        "samples": [123, 124, 125],
+        "functions": [
+          {
+            "sample_id": 123,
+            "function_id": 9876,
+            "function_name": "decode_payload",
+            "offset": 4096
+          },
+          {
+            "sample_id": 124,
+            "function_id": 8765,
+            "function_name": "decrypt_data",
+            "offset": 8192
+          }
+        ]
+      }
+    }
+  }
+}
+```
+</ResponseExample>
+
+<ResponseField name="sample_ids" type="array">
+  Array of sample IDs analyzed
+</ResponseField>
+
+<ResponseField name="total_blocks" type="integer">
+  Total number of blocks in the specified samples
+</ResponseField>
+
+<ResponseField name="unique_blocks" type="integer">
+  Number of blocks unique to this sample set
+</ResponseField>
+
+<ResponseField name="uniqueness_ratio" type="float">
+  Ratio of unique blocks to total blocks (0.0-1.0)
+</ResponseField>
+
+<ResponseField name="blocks" type="object">
+  Dictionary of unique blocks keyed by PicBlockHash
+</ResponseField>
+
+Identifies code blocks that appear only in the specified samples and nowhere else in the database.
+
+---
+
+## Get Unique Blocks for Family
+
+<ParamField path="family_id" type="integer" required>
+  Family ID to analyze
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET https://your-mcrit-instance/uniqueblocks/family/42
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "family_id": 42,
+    "family_name": "malware_family",
+    "sample_count": 15,
+    "total_blocks": 12345,
+    "unique_blocks": 892,
+    "uniqueness_ratio": 0.072,
+    "blocks": {
+      "b2c3d4e5f6a7b8c9": {
+        "picblockhash": "b2c3d4e5f6a7b8c9",
+        "occurrences": 8,
+        "samples": [123, 124, 125, 126, 127, 128, 129, 130],
+        "functions": [
+          {
+            "sample_id": 123,
+            "function_id": 9876,
+            "function_name": "family_specific_routine",
+            "offset": 4096
+          }
+        ]
+      }
+    }
+  }
+}
+```
+</ResponseExample>
+
+Identifies code blocks that appear only within a specific malware family and not in other families or samples in the database.
+
+---
+
+## Understanding Unique Block Analysis
+
+<Accordion title="Use Cases">
+  **Malware Family Characterization**
+  
+  Identify code patterns that distinguish one family from another. High uniqueness ratios suggest distinctive implementation details.
+  
+  **Variant Analysis**
+  
+  Compare unique blocks across family variants to identify evolutionary changes and version-specific code.
+  
+  **YARA Rule Generation**
+  
+  Use unique blocks as the basis for creating precise detection signatures that minimize false positives.
+  
+  **Threat Intelligence**
+  
+  Unique blocks help attribute unknown samples to known families based on distinctive code patterns.
+</Accordion>
+
+<Accordion title="Interpreting Uniqueness Ratio">
+  The uniqueness ratio indicates how distinctive the code is:
+  
+  - **0.0-0.05 (0-5%)**: Highly common code, mostly library functions
+  - **0.05-0.15 (5-15%)**: Mix of common and custom code, typical for malware
+  - **0.15-0.30 (15-30%)**: Significant custom implementation
+  - **0.30+ (30%+)**: Highly distinctive code, rare or custom-built
+</Accordion>
+
+<Accordion title="Block Occurrence Interpretation">
+  **High Occurrence in Family, Zero Outside**
+  
+  These are signature blocks for the family - excellent candidates for detection rules.
+  
+  **Low Occurrence within Family**
+  
+  May indicate variant-specific code or recently added functionality.
+  
+  **Distributed Across Many Functions**
+  
+  Could represent a code pattern or idiom specific to the family's developers.
+</Accordion>
+
+---
+
+## Example Workflow
+
+<Steps>
+  <Step title="Identify Target Samples">
+    Select a set of related samples or a malware family to analyze
+  </Step>
+  
+  <Step title="Request Unique Blocks">
+    Call the appropriate endpoint with sample IDs or family ID
+  </Step>
+  
+  <Step title="Analyze Results">
+    Review the uniqueness ratio and examine specific blocks with high occurrence counts
+  </Step>
+  
+  <Step title="Create Signatures">
+    Use PicBlockHash values and block patterns to create detection rules or threat intelligence indicators
+  </Step>
+  
+  <Step title="Validate">
+    Test signatures against other samples to ensure they're specific to the target family
+  </Step>
+</Steps>
+
+<Note>Unique block analysis is computationally intensive for large families. Consider analyzing subsets of samples for faster results.</Note>

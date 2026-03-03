@@ -1,0 +1,164 @@
+---
+title: Docker Deployment
+description: Deploy MCRIT using docker-mcrit for simplified setup and consistent environments
+---
+
+For the easiest deployment experience, we highly recommend using [docker-mcrit](https://github.com/danielplohmann/docker-mcrit), which provides a fully packaged MCRIT environment with all components pre-configured.
+
+## Why Docker?
+
+The docker-mcrit deployment offers several key advantages over standalone installation:
+
+### Fully Compatible Versions
+
+All components are tested and packaged together, ensuring compatibility between:
+- MCRIT backend and API
+- MongoDB database version
+- Web frontend (MCRITweb)
+- Python dependencies and libraries
+
+### Complete Integration
+
+The Docker deployment includes everything you need:
+- **MCRIT server**: REST API for all operations
+- **MongoDB**: Persistent database for all data
+- **MCRITweb**: Web-based frontend for convenient interaction
+- **Workers**: Pre-configured job processing
+
+### Simplified Deployment
+
+Docker eliminates complex setup steps:
+- No manual dependency installation
+- No database configuration required
+- Consistent environment across different systems
+- Easy updates and version management
+
+## Quick Start
+
+<Steps>
+  <Step title="Clone docker-mcrit">
+    ```bash
+    git clone https://github.com/danielplohmann/docker-mcrit.git
+    cd docker-mcrit
+    ```
+  </Step>
+
+  <Step title="Start Services">
+    Use Docker Compose to launch all components:
+
+    ```bash
+    docker-compose up -d
+    ```
+
+    This command starts:
+    - MongoDB database
+    - MCRIT server
+    - MCRIT workers
+    - MCRITweb frontend
+  </Step>
+
+  <Step title="Access MCRIT">
+    Once running, you can access:
+    - **Web Interface**: `http://localhost` (MCRITweb)
+    - **REST API**: `http://localhost:8000`
+  </Step>
+</Steps>
+
+## Docker Architecture
+
+The docker-mcrit deployment runs multiple interconnected containers:
+
+```
+┌─────────────────┐
+│   MCRITweb      │  Web interface on port 80/443
+│   (Frontend)    │
+└────────┬────────┘
+         │
+┌────────▼────────┐
+│  MCRIT Server   │  REST API on port 8000
+│   (Backend)     │
+└────────┬────────┘
+         │
+    ┌────┴────┐
+    │         │
+┌───▼──┐  ┌──▼───┐
+│Worker│  │Worker│  Process jobs from queue
+└───┬──┘  └──┬───┘
+    │        │
+    └───┬────┘
+        │
+   ┌────▼────┐
+   │ MongoDB │  Persistent storage
+   └─────────┘
+```
+
+## Configuration
+
+The docker-mcrit repository includes configuration files for customizing:
+
+- Port mappings
+- Worker count and resources
+- MongoDB credentials and storage
+- API authentication tokens
+- Resource limits and timeouts
+
+<Note>
+  Review the docker-compose.yml file to understand and customize the deployment for your environment.
+</Note>
+
+## Data Persistence
+
+MongoDB data is stored in Docker volumes, ensuring persistence across container restarts and updates. Back up these volumes regularly for production deployments.
+
+## Advantages Summary
+
+<CardGroup cols={2}>
+  <Card title="Version Compatibility" icon="check-double">
+    All components tested and packaged together
+  </Card>
+  <Card title="Complete Stack" icon="layer-group">
+    Database, backend, frontend, and workers included
+  </Card>
+  <Card title="Easy Updates" icon="rotate">
+    Pull latest images and restart services
+  </Card>
+  <Card title="Isolated Environment" icon="container-storage">
+    No conflicts with system packages
+  </Card>
+</CardGroup>
+
+## Updating
+
+To update to the latest version:
+
+```bash
+# Pull latest images
+docker-compose pull
+
+# Restart services with new images
+docker-compose up -d
+```
+
+## Monitoring
+
+View logs from all services:
+
+```bash
+# All services
+docker-compose logs -f
+
+# Specific service
+docker-compose logs -f mcrit-server
+docker-compose logs -f mcrit-worker
+```
+
+## Production Deployment
+
+For production use:
+
+1. Configure authentication and API tokens
+2. Set up HTTPS/TLS for the web interface
+3. Configure backup strategies for MongoDB volumes
+4. Set resource limits for containers
+5. Monitor container health and logs
+6. Use Docker Swarm or Kubernetes for high availability

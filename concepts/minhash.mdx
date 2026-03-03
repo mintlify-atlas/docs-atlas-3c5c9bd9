@@ -1,0 +1,187 @@
+---
+title: MinHash
+description: Understanding MinHash algorithm and its application to code similarity in MCRIT
+---
+
+## Overview
+
+MinHash is a probabilistic algorithm used in MCRIT to efficiently detect similar functions across binaries. It converts function characteristics into compact signatures that enable fast similarity comparisons at scale.
+
+## How MinHash Works
+
+MinHash transforms sets of elements (shingles) into fixed-size signatures that preserve similarity. Functions with similar characteristics will have similar MinHash signatures.
+
+### Key Concepts
+
+- **Signature Length**: Each MinHash consists of 64 hash values by default (configurable via `MINHASH_SIGNATURE_LENGTH`)
+- **Signature Bits**: Each hash value uses 8 bits by default (configurable from 1-32 bits via `MINHASH_SIGNATURE_BITS`)
+- **Hash Function**: Uses MurmurHash3 (mmh3) for fast, high-quality hashing
+
+### MinHash Strategies
+
+MCRIT implements three different MinHash calculation strategies:
+
+#### 1. Hash All Seeds (`MINHASH_STRATEGY_HASH_ALL`)
+
+Calculates hash function every time, then takes minimum shingle per shingler:
+
+```python
+for hash_seed in self._minhash_config.HASH_SEEDS:
+    minimum_shingles = []
+    for shingler in self._shinglers:
+        shingler_outputs = shingler.process(smda_function, hash_seed)
+        # Take minimum from each shingler's output
+        minimum_shingle = min(merged_outputs)
+        minimum_shingles.append(minimum_shingle)
+    minhash_value = min(minimum_shingles)
+    minhash_signature.append(minhash_value)
+```
+
+#### 2. XOR All (`MINHASH_STRATEGY_XOR_ALL`)
+
+Calculates shingles once per shingler, then XORs all shingles:
+
+```python
+for hash_seed in self._minhash_seeds:
+    xored_shingles = []
+    for shingler, outputs in sorted(shingler_outputs.items()):
+        xored_outputs = [shingle ^ hash_seed for shingle in output]
+        minimum_shingle = min(xored_outputs)
+        xored_shingles.append(minimum_shingle)
+    minhash_value = min(xored_shingles)
+```
+
+#### 3. Segmented (Default) (`MINHASH_STRATEGY_SEGMENTED`)
+
+Splits the signature into segments according to shingler weights. Each shingler only competes within its assigned segments:
+
+```python
+for index, shingler_name in enumerate(self._signature_segments):
+    hash_seed = self._minhash_seeds[index]
+    xored_outputs = [shingle ^ hash_seed for shingle in shingler_outputs[shingler_name]]
+    minhash_value = min(xored_outputs)
+    minhash_signature.append(minhash_value)
+```
+
+This approach ensures each shingler type contributes proportionally to the signature based on its weight.
+
+## MinHash in MCRIT
+
+### MinHash Class
+
+The `MinHash` class (from `mcrit/minhash/MinHash.py`) is a data transfer object that stores:
+
+```python
+class MinHash(object):
+    def __init__(self, function_id=None, minhash_bytes=None, minhash_signature=None, minhash_bits=32):
+        self.minhash = b""  # Binary packed int8/32 values
+        self.minhash_int = []  # List representation
+        self.shingler_composition = {}  # Tracks which shinglers contributed
+        self.function_id = function_id
+```
+
+### Similarity Scoring
+
+MinHash similarity is calculated by comparing how many signature elements match:
+
+```python
+@staticmethod
+def calculateMinHashScore(first, second, minhash_bits=32):
+    if minhash_bits <= 8:
+        first_np = np.frombuffer(first, dtype=np.uint8)
+        second_np = np.frombuffer(second, dtype=np.uint8)
+    else:
+        first_np = np.frombuffer(first, dtype=np.uint32)
+        second_np = np.frombuffer(second, dtype=np.uint32)
+    return 100.0 * sum(first_np == second_np) / len(first_np)
+```
+
+The score ranges from 0-100%, where 100% indicates identical signatures.
+
+## Band-Based Indexing
+
+MCRIT uses Locality-Sensitive Hashing (LSH) with bands to make MinHash matching efficient:
+
+### How Bands Work
+
+1. **Signature Splitting**: Each 64-element MinHash signature is divided into bands
+2. **Band Indexing**: Each band is hashed and stored in an index
+3. **Candidate Generation**: Functions with matching bands become candidates for comparison
+4. **Band Matches Required**: By default, at least 2 band matches are required (`BAND_MATCHES_REQUIRED`)
+
+This approach reduces the number of pairwise comparisons from O(n²) to approximately O(n).
+
+<Note>
+Bands act as a filter: if two functions don't share any band matches, they're unlikely to be similar and don't need detailed comparison.
+</Note>
+
+## Configuration
+
+Key MinHash configuration parameters (from `config/MinHashConfig.py`):
+
+```python
+# Length of MinHash signature
+MINHASH_SIGNATURE_LENGTH: int = 64
+
+# Bits per signature element (1-32)
+MINHASH_SIGNATURE_BITS: int = 8
+
+# Minimum similarity threshold (0-100)
+MINHASH_MATCHING_THRESHOLD: int = 50
+
+# Strategy to use
+MINHASH_STRATEGY = MinHasher.MINHASH_STRATEGY_SEGMENTED
+
+# Minimum function size for hashing
+MINHASH_FN_MIN_INS: int = 10
+MINHASH_FN_MIN_BLOCKS: int = 0
+
+# Random seed for reproducibility
+MINHASH_SEED: int = 0xDEADBEEF
+
+# Minimum band matches required
+BAND_MATCHES_REQUIRED = 2
+```
+
+## Function Eligibility
+
+Not all functions are MinHashed. A function must meet minimum size criteria:
+
+```python
+def isMinHashableFunction(self, smda_function):
+    is_hashable = False
+    if (self._minhash_config.MINHASH_FN_MIN_BLOCKS 
+        and smda_function.num_blocks > self._minhash_config.MINHASH_FN_MIN_BLOCKS):
+        is_hashable = True
+    if (self._minhash_config.MINHASH_FN_MIN_INS 
+        and smda_function.num_instructions > self._minhash_config.MINHASH_FN_MIN_INS):
+        is_hashable = True
+    return is_hashable
+```
+
+By default, functions need at least 10 instructions to be considered.
+
+## Performance Considerations
+
+### Signature Size vs Accuracy
+
+- **8-bit signatures**: More compact, faster matching, slight accuracy loss
+- **32-bit signatures**: Higher accuracy, more storage required
+
+### Matching Thresholds
+
+- **50% (default)**: Balanced for most use cases
+- **Higher thresholds**: Reduce false positives, may miss variants
+- **Lower thresholds**: Find more variants, increase false positives
+
+## Related Concepts
+
+<CardGroup cols={2}>
+  <Card title="Shinglers" icon="puzzle-piece" href="/concepts/shinglers">
+    Learn how shinglers generate the features that MinHash operates on
+  </Card>
+  
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    See how MinHash fits into the overall MCRIT system
+  </Card>
+</CardGroup>

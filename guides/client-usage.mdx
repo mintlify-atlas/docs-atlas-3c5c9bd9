@@ -1,0 +1,396 @@
+---
+title: Python Client Usage
+description: Use the McritClient Python library to interact with MCRIT programmatically
+---
+
+The `McritClient` class provides a Python interface to all MCRIT API endpoints. Use it to build custom tools, automation scripts, and integrations with MCRIT.
+
+## Installation
+
+The client is included with the MCRIT package:
+
+```bash
+pip install mcrit
+```
+
+## Basic Usage
+
+### Instantiation
+
+<CodeGroup>
+```python Basic Connection
+from mcrit.client.McritClient import McritClient
+
+# Connect to local MCRIT instance
+client = McritClient()
+
+# Connect to remote MCRIT instance
+client = McritClient(mcrit_server="http://mcrit.example.com:8000")
+```
+
+```python With Authentication
+from mcrit.client.McritClient import McritClient
+
+# With API token
+client = McritClient(
+    mcrit_server="http://mcrit.example.com:8000",
+    apitoken="your-api-token-here"
+)
+
+# With username and API token
+client = McritClient(
+    mcrit_server="http://mcrit.example.com:8000",
+    apitoken="your-api-token-here",
+    username="analyst"
+)
+```
+
+```python Raw Responses
+from mcrit.client.McritClient import McritClient
+
+# Get raw HTTP responses instead of parsed data
+client = McritClient(
+    mcrit_server="http://mcrit.example.com:8000",
+    raw_responses=True
+)
+```
+</CodeGroup>
+
+The `McritClient` constructor (`source/mcrit/client/McritClient.py:56-65`) accepts:
+- `mcrit_server`: URL of MCRIT server (default: `http://localhost:8000`)
+- `apitoken`: Optional API token for authentication
+- `username`: Optional username for tracking submissions
+- `raw_responses`: Return raw HTTP responses instead of parsed data
+
+### Authentication
+
+You can set or update authentication credentials after instantiation:
+
+```python
+client = McritClient()
+
+# Set API token
+client.setApitoken("your-api-token-here")
+
+# Set username
+client.setUsername("analyst")
+```
+
+## Common Workflows
+
+### Check Server Status
+
+```python
+from mcrit.client.McritClient import McritClient
+
+client = McritClient()
+
+# Get server status and statistics
+status = client.getStatus()
+print(f"Storage type: {status['status']['storage_type']}")
+print(f"Samples: {status['status']['num_samples']}")
+print(f"Functions: {status['status']['num_functions']}")
+print(f"Families: {status['status']['num_families']}")
+
+# Get server version
+version = client.getVersion()
+print(f"MCRIT version: {version}")
+```
+
+### Add Samples
+
+<CodeGroup>
+```python From SMDA Report
+from mcrit.client.McritClient import McritClient
+from smda.Disassembler import Disassembler
+
+client = McritClient()
+disassembler = Disassembler()
+
+# Disassemble binary
+with open("malware.exe", "rb") as f:
+    binary = f.read()
+report = disassembler.disassembleBuffer(binary, base_address=0x400000)
+
+# Submit to MCRIT
+sample_entry, job_id = client.addReport(report)
+print(f"Sample ID: {sample_entry.sample_id}")
+print(f"Job ID: {job_id}")
+```
+
+```python From Binary
+from mcrit.client.McritClient import McritClient
+
+client = McritClient()
+
+# Submit binary directly
+with open("malware.exe", "rb") as f:
+    binary = f.read()
+
+result = client.addBinarySample(
+    binary,
+    filename="malware.exe",
+    family="emotet",
+    version="2023-01",
+    is_dump=False,
+    bitness=32
+)
+```
+</CodeGroup>
+
+### Query for Matches
+
+<CodeGroup>
+```python Query Sample
+from mcrit.client.McritClient import McritClient
+from smda.Disassembler import Disassembler
+
+client = McritClient()
+disassembler = Disassembler()
+
+# Disassemble unknown sample
+with open("unknown.exe", "rb") as f:
+    binary = f.read()
+report = disassembler.disassembleBuffer(binary, base_address=0x400000)
+
+# Request matches
+job_id = client.requestMatchesForSmdaReport(
+    report,
+    minhash_threshold=0.7,
+    pichash_size=8
+)
+
+# Wait for results
+result = client.awaitResult(job_id)
+print(f"Matches found: {len(result['matches'])}")
+```
+
+```python Query by Sample ID
+from mcrit.client.McritClient import McritClient
+
+client = McritClient()
+
+# Query existing sample against database
+job_id = client.requestMatchesForSample(
+    sample_id=123,
+    minhash_threshold=0.8
+)
+
+# Wait for results
+result = client.awaitResult(job_id)
+```
+
+```python Query Function
+from mcrit.client.McritClient import McritClient
+from smda.Disassembler import Disassembler
+from smda.common.SmdaReport import SmdaReport
+
+client = McritClient()
+
+# Create report with single function
+# (extract specific function from larger report)
+function_report = SmdaReport()
+function_report.addFunction(single_function)
+
+# Get matches for this function
+matches = client.getMatchesForSmdaFunction(
+    function_report,
+    minhash_threshold=0.8,
+    exclude_self_matches=True
+)
+```
+</CodeGroup>
+
+### Retrieve Data
+
+<CodeGroup>
+```python Get Samples
+from mcrit.client.McritClient import McritClient
+
+client = McritClient()
+
+# Get all samples
+samples = client.getSamples()
+for sample_id, sample in samples.items():
+    print(f"{sample_id}: {sample.family} - {sample.sha256}")
+
+# Get specific sample
+sample = client.getSampleById(sample_id=123)
+print(f"Family: {sample.family}")
+print(f"Functions: {len(sample.function_ids)}")
+
+# Get sample by SHA256
+sample = client.getSampleBySha256("abc123...")
+```
+
+```python Get Functions
+from mcrit.client.McritClient import McritClient
+
+client = McritClient()
+
+# Get functions for a sample
+functions = client.getFunctionsBySampleId(sample_id=123)
+for func in functions:
+    print(f"{func.function_name} @ 0x{func.offset:x}")
+
+# Get specific function with XCFG data
+func = client.getFunctionById(
+    function_id=456,
+    with_xcfg=True
+)
+```
+
+```python Get Families
+from mcrit.client.McritClient import McritClient
+
+client = McritClient()
+
+# Get all families
+families = client.getFamilies()
+for family_id, family in families.items():
+    print(f"{family.family_name}: {len(family.samples)} samples")
+
+# Get specific family with samples
+family = client.getFamily(family_id=5, with_samples=True)
+```
+</CodeGroup>
+
+### Monitor Jobs
+
+```python
+from mcrit.client.McritClient import McritClient
+import time
+
+client = McritClient()
+
+# Get queue statistics
+stats = client.getQueueStatistics(with_refresh=True)
+print(f"Pending jobs: {stats['pending']}")
+print(f"In progress: {stats['in_progress']}")
+print(f"Completed: {stats['completed']}")
+
+# Get specific job status
+job = client.getJobData(job_id="64243b27f3876416bffad86e")
+print(f"Job state: {job.state}")
+print(f"Progress: {job.progress}%")
+
+# Wait for job completion
+job_id = "64243b27f3876416bffad86e"
+result = client.awaitResult(job_id, sleep_time=2)
+```
+
+### Export and Import
+
+<CodeGroup>
+```python Export Samples
+from mcrit.client.McritClient import McritClient
+import json
+
+client = McritClient()
+
+# Export specific samples
+export_data = client.getExportData(
+    sample_ids=[1, 2, 3],
+    compress_data=True
+)
+
+# Save to file
+with open("export.mcrit", "w") as f:
+    json.dump(export_data, f)
+```
+
+```python Import Samples
+from mcrit.client.McritClient import McritClient
+import json
+
+client = McritClient()
+
+# Load export file
+with open("export.mcrit", "r") as f:
+    import_data = json.load(f)
+
+# Import into MCRIT
+result = client.addImportData(import_data)
+print(f"Imported: {result['num_samples_imported']} samples")
+print(f"Skipped: {result['num_samples_skipped']} samples")
+```
+</CodeGroup>
+
+## Advanced Features
+
+### Cross Matching
+
+Compare multiple samples against each other:
+
+```python
+from mcrit.client.McritClient import McritClient
+
+client = McritClient()
+
+# Cross-match samples 1, 2, and 3
+job_id = client.requestMatchesCross(
+    sample_ids=[1, 2, 3],
+    minhash_threshold=0.75,
+    sample_group_only=True  # Only match within this group
+)
+
+result = client.awaitResult(job_id)
+```
+
+### PicHash Queries
+
+Query by PicHash or PicBlockHash:
+
+```python
+from mcrit.client.McritClient import McritClient
+
+client = McritClient()
+
+# Find functions with matching PicHash
+pichash = 0x1234567890abcdef
+matches = client.getMatchesForPicHash(pichash, summary=True)
+
+# Find basic blocks with matching PicBlockHash
+picblockhash = 0xfedcba0987654321
+matches = client.getMatchesForPicBlockHash(picblockhash, summary=False)
+```
+
+### Unique Blocks
+
+Identify unique code blocks in samples:
+
+```python
+from mcrit.client.McritClient import McritClient
+
+client = McritClient()
+
+# Find unique blocks in specific samples
+job_id = client.requestUniqueBlocksForSamples(sample_ids=[1, 2, 3])
+result = client.awaitResult(job_id)
+
+# Find unique blocks for entire family
+job_id = client.requestUniqueBlocksForFamily(family_id=5)
+result = client.awaitResult(job_id)
+```
+
+## Error Handling
+
+```python
+from mcrit.client.McritClient import McritClient, JobTerminatedError
+
+client = McritClient()
+
+try:
+    job_id = client.requestMatchesForSample(sample_id=123)
+    result = client.awaitResult(job_id)
+except JobTerminatedError:
+    print("Job was terminated before completion")
+except Exception as e:
+    print(f"Error: {e}")
+```
+
+## Reference
+
+For complete API documentation, see:
+- `source/mcrit/client/McritClient.py` - Full client implementation
+- API endpoint documentation for available parameters and return values

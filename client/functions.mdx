@@ -1,0 +1,234 @@
+---
+title: 'Function Methods'
+description: 'Methods for retrieving and analyzing functions in MCRIT'
+---
+
+## Overview
+
+Function methods allow you to retrieve individual functions from analyzed samples. Each function represents a discrete code unit extracted during the SMDA disassembly process.
+
+## Retrieve Functions
+
+### getFunctionsBySampleId()
+
+Get all FunctionEntries for a given sample.
+
+```python
+client.getFunctionsBySampleId(sample_id)
+```
+
+<ParamField path="sample_id" type="int" required>
+  The sample ID whose functions to retrieve
+</ParamField>
+
+<ResponseField name="return" type="List[FunctionEntry]">
+  List of FunctionEntry objects, or None if the sample is not found
+</ResponseField>
+
+**Example:**
+
+```python
+from mcrit.client.McritClient import McritClient
+
+client = McritClient(mcrit_server="http://localhost:8000")
+
+# Get all functions for a sample
+functions = client.getFunctionsBySampleId(123)
+
+if functions:
+    print(f"Found {len(functions)} functions")
+    for func in functions:
+        print(f"Function {func.function_id}: {func.function_name}")
+        print(f"  Offset: 0x{func.offset:x}")
+        print(f"  Size: {func.num_bytes} bytes")
+        print(f"  Instructions: {func.num_instructions}")
+```
+
+### getFunctionById()
+
+Get a FunctionEntry by its function_id.
+
+```python
+client.getFunctionById(function_id: int, with_xcfg=False) -> Optional[FunctionEntry]
+```
+
+<ParamField path="function_id" type="int" required>
+  The ID of the function to retrieve
+</ParamField>
+
+<ParamField path="with_xcfg" type="bool" default="False">
+  Whether to include the extended control flow graph (XCFG) data
+</ParamField>
+
+<ResponseField name="return" type="FunctionEntry">
+  The function entry object, or None if not found
+</ResponseField>
+
+**Example:**
+
+```python
+# Get basic function information
+function = client.getFunctionById(45678)
+if function:
+    print(f"Function: {function.function_name}")
+    print(f"Sample ID: {function.sample_id}")
+    print(f"Offset: 0x{function.offset:x}")
+
+# Get function with extended CFG data
+function = client.getFunctionById(45678, with_xcfg=True)
+if function:
+    print(f"Function: {function.function_name}")
+    print(f"XCFG available: {function.xcfg is not None}")
+    if function.xcfg:
+        print(f"Basic blocks: {len(function.xcfg)}")
+```
+
+### getFunctions()
+
+Get all FunctionEntries, optionally with pagination.
+
+```python
+client.getFunctions(start=0, limit=0)
+```
+
+<ParamField path="start" type="int" default="0">
+  Starting function_id for pagination
+</ParamField>
+
+<ParamField path="limit" type="int" default="0">
+  Maximum number of functions to return (0 for no limit)
+</ParamField>
+
+<ResponseField name="return" type="Dict[int, FunctionEntry]">
+  Dictionary mapping function IDs to FunctionEntry objects
+</ResponseField>
+
+**Example:**
+
+```python
+# Get all functions (warning: may be very large)
+all_functions = client.getFunctions()
+
+# Get first 1000 functions
+functions = client.getFunctions(start=0, limit=1000)
+
+for func_id, func_entry in functions.items():
+    print(f"Function {func_id}: {func_entry.function_name}")
+```
+
+### getFunctionsByIds()
+
+Get multiple FunctionEntries by a list of function IDs.
+
+```python
+client.getFunctionsByIds(function_ids: list, with_label_only=False)
+```
+
+<ParamField path="function_ids" type="list" required>
+  List of function IDs to retrieve
+</ParamField>
+
+<ParamField path="with_label_only" type="bool" default="False">
+  If True, only return functions that have labels/names
+</ParamField>
+
+<ResponseField name="return" type="Dict[int, FunctionEntry]">
+  Dictionary mapping function IDs to FunctionEntry objects
+</ResponseField>
+
+**Example:**
+
+```python
+# Get specific functions
+function_ids = [100, 200, 300, 400]
+functions = client.getFunctionsByIds(function_ids)
+
+for func_id, func_entry in functions.items():
+    print(f"Function {func_id}: {func_entry.function_name}")
+
+# Get only labeled functions from the list
+labeled_functions = client.getFunctionsByIds(function_ids, with_label_only=True)
+print(f"Found {len(labeled_functions)} labeled functions")
+```
+
+## Check Function Existence
+
+### isFunctionId()
+
+Check if a function_id exists in MCRIT.
+
+```python
+client.isFunctionId(function_id) -> bool
+```
+
+<ParamField path="function_id" type="int" required>
+  The function ID to check
+</ParamField>
+
+<ResponseField name="return" type="bool">
+  True if the function exists, False otherwise
+</ResponseField>
+
+**Example:**
+
+```python
+if client.isFunctionId(45678):
+    print("Function exists")
+    function = client.getFunctionById(45678)
+else:
+    print("Function not found")
+```
+
+## Working with Function Data
+
+The `FunctionEntry` object contains detailed information about each function:
+
+**Key attributes:**
+- `function_id`: Unique identifier
+- `sample_id`: Parent sample ID
+- `function_name`: Function name or label
+- `offset`: Virtual address offset
+- `num_bytes`: Size in bytes
+- `num_instructions`: Number of assembly instructions
+- `num_blocks`: Number of basic blocks
+- `minhash`: MinHash signature for similarity matching
+- `pichash`: PIC hash for position-independent code matching
+- `xcfg`: Extended control flow graph (when requested)
+
+**Example: Analyzing function characteristics**
+
+```python
+functions = client.getFunctionsBySampleId(123)
+
+if functions:
+    # Find largest function
+    largest = max(functions, key=lambda f: f.num_bytes)
+    print(f"Largest function: {largest.function_name}")
+    print(f"  Size: {largest.num_bytes} bytes")
+    print(f"  Instructions: {largest.num_instructions}")
+    
+    # Calculate statistics
+    total_size = sum(f.num_bytes for f in functions)
+    avg_size = total_size / len(functions)
+    print(f"Average function size: {avg_size:.2f} bytes")
+    
+    # Find functions with specific characteristics
+    large_functions = [f for f in functions if f.num_bytes > 1000]
+    print(f"Functions larger than 1KB: {len(large_functions)}")
+```
+
+**Example: Retrieving function CFG for analysis**
+
+```python
+function = client.getFunctionById(45678, with_xcfg=True)
+
+if function and function.xcfg:
+    print(f"Analyzing CFG for {function.function_name}")
+    print(f"Basic blocks: {len(function.xcfg)}")
+    
+    # Analyze control flow structure
+    for block_id, block_data in function.xcfg.items():
+        print(f"Block {block_id}:")
+        print(f"  Address: 0x{block_data['offset']:x}")
+        print(f"  Size: {block_data['size']} bytes")
+```

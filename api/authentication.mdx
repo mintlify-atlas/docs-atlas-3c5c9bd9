@@ -1,0 +1,196 @@
+---
+title: 'Authentication'
+description: 'API token authentication for MCRIT'
+---
+
+## Overview
+
+MCRIT supports optional API token authentication to secure access to the REST API. When enabled, all requests must include a valid API token in the request headers.
+
+## Authentication Middleware
+
+Authentication is implemented using Falcon middleware (application_routes.py:25-53) that intercepts all requests before they reach the endpoint handlers.
+
+## Enabling Authentication
+
+### Configure AUTH_TOKEN
+
+Authentication is controlled by the `AUTH_TOKEN` setting in `McritConfig`:
+
+```python
+from mcrit.config.McritConfig import McritConfig
+
+# Set your API token
+McritConfig.AUTH_TOKEN = "your-secret-token-here"
+```
+
+**Default:** `AUTH_TOKEN = ""` (authentication disabled)
+
+### How It Works
+
+1. If `AUTH_TOKEN` is empty or `None`, authentication is **disabled** and all requests are allowed
+2. If `AUTH_TOKEN` is set to a non-empty string, authentication is **enabled**:
+   - All requests must include the `apitoken` header
+   - The token value must exactly match the configured `AUTH_TOKEN`
+   - Invalid or missing tokens result in HTTP 401 Unauthorized
+
+## Making Authenticated Requests
+
+### Using the apitoken Header
+
+Include your API token in the `apitoken` header:
+
+```bash
+curl -H "apitoken: your-secret-token-here" \
+  http://127.0.0.1:8000/status
+```
+
+### Example: Submit a Binary
+
+```bash
+curl -X POST \
+  -H "apitoken: your-secret-token-here" \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @/path/to/binary.exe \
+  http://127.0.0.1:8000/samples/binary
+```
+
+### Example: Query by Sample ID
+
+```bash
+curl -H "apitoken: your-secret-token-here" \
+  http://127.0.0.1:8000/samples/42
+```
+
+## Optional Username Header
+
+MCRIT supports an optional `username` header for logging and auditing purposes. This is separate from authentication but can be useful for tracking which user made a request:
+
+```bash
+curl -H "apitoken: your-secret-token-here" \
+  -H "username: analyst@example.com" \
+  http://127.0.0.1:8000/status
+```
+
+The username is logged in the database for audit trails but is not used for authentication.
+
+## Error Responses
+
+### Missing Token
+
+When authentication is enabled and no token is provided:
+
+```bash
+curl http://127.0.0.1:8000/status
+```
+
+Response:
+```json
+{
+  "title": "API token required",
+  "description": "Please provide an auth token as part of the request."
+}
+```
+HTTP Status: `401 Unauthorized`
+
+### Invalid Token
+
+When the provided token doesn't match:
+
+```bash
+curl -H "apitoken: wrong-token" http://127.0.0.1:8000/status
+```
+
+Response:
+```json
+{
+  "title": "Authentication required",
+  "description": "The provided API token is not valid. Please request a new token and try again."
+}
+```
+HTTP Status: `401 Unauthorized`
+
+## Security Considerations
+
+### Token Storage
+- Store your API token securely (environment variables, secrets manager)
+- Never commit tokens to version control
+- Rotate tokens periodically
+
+### HTTPS
+When deploying to production:
+- **Always use HTTPS** to encrypt API tokens in transit
+- HTTP sends tokens in plaintext, making them vulnerable to interception
+- Configure your reverse proxy (nginx, Apache) with TLS certificates
+
+### Token Strength
+Choose a strong, random token:
+```bash
+# Generate a secure random token
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+### Access Control
+- The current implementation uses a single shared token
+- All authenticated users have the same permissions
+- Consider implementing role-based access control for multi-user environments
+
+## Deployment Example
+
+Set the token via environment variable:
+
+```bash
+# In your deployment script or systemd service
+export MCRIT_AUTH_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+
+# In your Python startup code
+import os
+from mcrit.config.McritConfig import McritConfig
+
+McritConfig.AUTH_TOKEN = os.environ.get('MCRIT_AUTH_TOKEN', '')
+```
+
+## Implementation Reference
+
+The authentication logic is implemented in application_routes.py:25-53:
+
+```python
+class AuthMiddleware:
+    def process_request(self, req, resp):
+        if McritConfig.AUTH_TOKEN in [None, ""]:
+            return
+        token = req.get_header('apitoken')
+
+        if token is None:
+            raise falcon.HTTPUnauthorized(
+                title='API token required',
+                description='Please provide an auth token as part of the request.',
+            )
+
+        if not self._token_is_valid(token):
+            raise falcon.HTTPUnauthorized(
+                title='Authentication required',
+                description='The provided API token is not valid. Please request a new token and try again.',
+            )
+
+    def _token_is_valid(self, token):
+        if McritConfig.AUTH_TOKEN in [None, ""]:
+            return True
+        return token == McritConfig.AUTH_TOKEN
+```
+
+## Testing Authentication
+
+### Verify Authentication is Disabled
+```bash
+curl http://127.0.0.1:8000/
+# Should return: {"status": "successful", "data": {"message": "Welcome to MCRIT"}}
+```
+
+### Verify Authentication is Enabled
+```bash
+# Without token - should fail
+curl http://127.0.0.1:8000/
+# With correct token - should succeed
+curl -H "apitoken: your-secret-token-here" http://127.0.0.1:8000/
+```

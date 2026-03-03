@@ -1,0 +1,381 @@
+---
+title: 'Samples'
+description: 'Manage and query binary samples'
+---
+
+## Overview
+
+Sample endpoints provide operations for adding, retrieving, updating, and deleting binary samples in the MCRIT database. Samples can be added as SMDA reports or raw binaries.
+
+---
+
+## List Samples
+
+<ParamField query="start" type="integer" default="0">
+  Starting index for pagination
+</ParamField>
+
+<ParamField query="limit" type="integer" default="0">
+  Maximum number of samples to return (0 = no limit)
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://your-mcrit-instance/samples?start=0&limit=100"
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "123": {
+      "sample_id": 123,
+      "sha256": "abc123...",
+      "family": "malware_family",
+      "version": "1.0",
+      "component": "loader",
+      "is_library": false,
+      "function_count": 42,
+      "timestamp": "2024-01-15T10:30:00"
+    },
+    "124": {...}
+  }
+}
+```
+</ResponseExample>
+
+Returns a dictionary of samples keyed by sample ID.
+
+---
+
+## Get Sample
+
+<ParamField path="sample_id" type="integer" required>
+  Unique identifier of the sample
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET https://your-mcrit-instance/samples/123
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "sample_id": 123,
+    "sha256": "abc123def456...",
+    "family": "malware_family",
+    "version": "1.0",
+    "component": "loader",
+    "filename": "sample.exe",
+    "bitness": 32,
+    "base_address": 4194304,
+    "is_library": false,
+    "is_dump": false,
+    "family_id": 42,
+    "function_count": 156,
+    "timestamp": "2024-01-15T10:30:00"
+  }
+}
+```
+</ResponseExample>
+
+<ResponseField name="sample_id" type="integer">
+  Unique identifier for the sample
+</ResponseField>
+
+<ResponseField name="sha256" type="string">
+  SHA256 hash of the binary
+</ResponseField>
+
+<ResponseField name="family" type="string">
+  Malware family name
+</ResponseField>
+
+<ResponseField name="version" type="string">
+  Version identifier (up to 64 printable characters)
+</ResponseField>
+
+<ResponseField name="component" type="string">
+  Component identifier (up to 64 printable characters)
+</ResponseField>
+
+<ResponseField name="is_library" type="boolean">
+  Whether this sample is a library
+</ResponseField>
+
+<ResponseField name="function_count" type="integer">
+  Number of functions in the sample
+</ResponseField>
+
+---
+
+## Get Sample by SHA256
+
+<ParamField path="sha256" type="string" required>
+  64-character hexadecimal SHA256 hash
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET https://your-mcrit-instance/samples/sha256/abc123def456789...
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "sample_id": 123,
+    "sha256": "abc123def456...",
+    "family": "malware_family",
+    "function_count": 156
+  }
+}
+```
+</ResponseExample>
+
+Retrieve a sample by its SHA256 hash. Returns 404 if the sample is not found.
+
+---
+
+## Add Sample (SMDA Report)
+
+<RequestExample>
+```bash cURL
+curl -X POST https://your-mcrit-instance/samples \
+  -H "Content-Type: application/json" \
+  -H "username: analyst" \
+  -d @smda_report.json
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "sample_id": 125,
+    "sha256": "def789...",
+    "function_count": 98,
+    "processing_time": 2.34
+  }
+}
+```
+</ResponseExample>
+
+Add a sample using an SMDA (Simple Malware Disassembly Analyzer) report in JSON format. The report should contain disassembly and function information.
+
+<ParamField header="username" type="string" default="anonymous">
+  Username for audit logging
+</ParamField>
+
+<Note>The SMDA report format should include function offsets, basic blocks, and instruction sequences.</Note>
+
+---
+
+## Add Sample (Binary)
+
+<ParamField query="filename" type="string">
+  Original filename of the binary
+</ParamField>
+
+<ParamField query="family" type="string">
+  Malware family name (0-64 alphanumeric chars with single dots, dashes, underscores)
+</ParamField>
+
+<ParamField query="version" type="string">
+  Version identifier (0-64 printable characters)
+</ParamField>
+
+<ParamField query="is_dump" type="boolean" default="false">
+  Whether the binary is a memory dump
+</ParamField>
+
+<ParamField query="base_addr" type="string">
+  Base address in hexadecimal (e.g., "0x400000")
+</ParamField>
+
+<ParamField query="bitness" type="integer" default="32">
+  Architecture bitness (32 or 64)
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X POST "https://your-mcrit-instance/samples/binary?filename=malware.exe&family=trojan&bitness=64" \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @malware.exe
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": "65f9a3b2c1d8e4f7a0b9c2d1"
+}
+```
+</ResponseExample>
+
+Submit a raw binary file for analysis. Returns a job ID (24-character hex string) for tracking the processing status. The binary will be disassembled using SMDA before being added to the database.
+
+<Note>If a sample with the same SHA256 already exists, the endpoint returns HTTP 409 Conflict with the existing sample ID.</Note>
+
+---
+
+## Update Sample
+
+<ParamField path="sample_id" type="integer" required>
+  Sample ID to update
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X PUT https://your-mcrit-instance/samples/123 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "family_name": "updated_family",
+    "version": "2.0",
+    "component": "dropper",
+    "is_library": true
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "message": "Sample modified."
+  }
+}
+```
+</ResponseExample>
+
+<ParamField body="family_name" type="string">
+  New family name (0-64 alphanumeric chars with single dots, dashes, underscores)
+</ParamField>
+
+<ParamField body="version" type="string">
+  New version (0-64 printable characters)
+</ParamField>
+
+<ParamField body="component" type="string">
+  New component identifier (0-64 printable characters)
+</ParamField>
+
+<ParamField body="is_library" type="boolean">
+  Update library status
+</ParamField>
+
+Updating sample metadata triggers index recalculation.
+
+---
+
+## Delete Sample
+
+<ParamField path="sample_id" type="integer" required>
+  Sample ID to delete
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X DELETE https://your-mcrit-instance/samples/123
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": true
+}
+```
+</ResponseExample>
+
+Deletes a sample and all associated functions from the database. Returns HTTP 202 on success. Index recalculation is triggered automatically.
+
+---
+
+## Get Sample Functions
+
+<ParamField path="sample_id" type="integer" required>
+  Sample ID
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET https://your-mcrit-instance/samples/123/functions
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "9876": {
+      "function_id": 9876,
+      "sample_id": 123,
+      "offset": 4096,
+      "function_name": "main",
+      "num_instructions": 156,
+      "num_blocks": 23,
+      "pichash": "a1b2c3d4e5f6a7b8",
+      "minhash": [123, 456, 789, ...],
+      "function_labels": ["entry_point"]
+    },
+    "9877": {...}
+  }
+}
+```
+</ResponseExample>
+
+Returns all functions belonging to a sample, sorted by offset. Functions are keyed by function ID.
+
+---
+
+## Get Sample Function
+
+<ParamField path="sample_id" type="integer" required>
+  Sample ID
+</ParamField>
+
+<ParamField path="function_id" type="integer" required>
+  Function ID
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X GET https://your-mcrit-instance/samples/123/functions/9876
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "status": "successful",
+  "data": {
+    "function_id": 9876,
+    "sample_id": 123,
+    "offset": 4096,
+    "function_name": "decode_payload",
+    "num_instructions": 156,
+    "num_blocks": 23,
+    "pichash": "a1b2c3d4e5f6a7b8",
+    "minhash": [123, 456, 789, ...],
+    "function_labels": ["crypto"],
+    "binweight": 0.72
+  }
+}
+```
+</ResponseExample>
+
+Retrieve a specific function from a sample. Returns 404 if the function doesn't belong to the specified sample.

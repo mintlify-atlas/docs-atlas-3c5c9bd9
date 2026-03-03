@@ -1,0 +1,333 @@
+---
+title: 'Matching Methods'
+description: 'Methods for matching samples and functions against the MCRIT database'
+---
+
+## Overview
+
+Matching methods enable code similarity analysis by comparing samples and functions against the MCRIT database. MCRIT uses MinHash and PicHash algorithms to identify similar code across different samples.
+
+## Sample Matching
+
+### requestMatchesForSample()
+
+Request matches for a sample already in the MCRIT database.
+
+```python
+client.requestMatchesForSample(
+    sample_id,
+    minhash_threshold=None,
+    pichash_size=None,
+    band_matches_required=None,
+    force_recalculation=False
+) -> str
+```
+
+<ParamField path="sample_id" type="int" required>
+  The sample ID to match against the database
+</ParamField>
+
+<ParamField path="minhash_threshold" type="float">
+  Minimum MinHash similarity score (0.0 to 1.0) for matches
+</ParamField>
+
+<ParamField path="pichash_size" type="int">
+  PicHash size for matching (typically 8, 16, or 32)
+</ParamField>
+
+<ParamField path="band_matches_required" type="int">
+  Minimum number of band matches required for LSH
+</ParamField>
+
+<ParamField path="force_recalculation" type="bool" default="False">
+  Force recalculation even if cached results exist
+</ParamField>
+
+<ResponseField name="return" type="str">
+  Job ID for tracking the matching operation
+</ResponseField>
+
+**Example:**
+
+```python
+from mcrit.client.McritClient import McritClient
+
+client = McritClient(mcrit_server="http://localhost:8000")
+
+# Request matches with default parameters
+job_id = client.requestMatchesForSample(sample_id=123)
+
+# Wait for results
+result = client.awaitResult(job_id)
+print(f"Found {len(result['matches'])} matches")
+
+# Request matches with custom thresholds
+job_id = client.requestMatchesForSample(
+    sample_id=123,
+    minhash_threshold=0.8,  # 80% similarity
+    pichash_size=16,
+    band_matches_required=5
+)
+```
+
+### requestMatchesForSampleVs()
+
+Match one sample against another specific sample.
+
+```python
+client.requestMatchesForSampleVs(
+    sample_id,
+    other_sample_id,
+    minhash_threshold=None,
+    pichash_size=None,
+    band_matches_required=None,
+    force_recalculation=False
+) -> str
+```
+
+<ParamField path="sample_id" type="int" required>
+  The first sample ID
+</ParamField>
+
+<ParamField path="other_sample_id" type="int" required>
+  The second sample ID to compare against
+</ParamField>
+
+**Example:**
+
+```python
+# Compare two specific samples
+job_id = client.requestMatchesForSampleVs(
+    sample_id=123,
+    other_sample_id=456,
+    minhash_threshold=0.7
+)
+
+result = client.awaitResult(job_id)
+print(f"Similarity between samples: {result['similarity']}")
+```
+
+### requestMatchesCross()
+
+Perform cross-matching between multiple samples.
+
+```python
+client.requestMatchesCross(
+    sample_ids,
+    sample_group_only=False,
+    minhash_threshold=None,
+    pichash_size=None,
+    band_matches_required=None,
+    force_recalculation=False
+) -> str
+```
+
+<ParamField path="sample_ids" type="list" required>
+  List of sample IDs to cross-match
+</ParamField>
+
+<ParamField path="sample_group_only" type="bool" default="False">
+  Only match within the provided sample group
+</ParamField>
+
+**Example:**
+
+```python
+# Cross-match multiple samples
+sample_ids = [100, 101, 102, 103]
+job_id = client.requestMatchesCross(
+    sample_ids=sample_ids,
+    minhash_threshold=0.75
+)
+
+result = client.awaitResult(job_id)
+for match in result['matches']:
+    print(f"Sample {match['sample_id_a']} matches {match['sample_id_b']}")
+```
+
+## Function Matching
+
+### getMatchFunctionVs()
+
+Compare two specific functions.
+
+```python
+client.getMatchFunctionVs(
+    function_id_a: int,
+    function_id_b: int
+)
+```
+
+<ParamField path="function_id_a" type="int" required>
+  First function ID
+</ParamField>
+
+<ParamField path="function_id_b" type="int" required>
+  Second function ID
+</ParamField>
+
+**Example:**
+
+```python
+match_data = client.getMatchFunctionVs(
+    function_id_a=1000,
+    function_id_b=2000
+)
+
+if match_data:
+    print(f"MinHash score: {match_data['minhash_score']}")
+    print(f"PicHash match: {match_data['pichash_match']}")
+```
+
+## Retrieve Match Results
+
+### getMatchesForSampleId()
+
+Retrieve cached match results for a sample (does not request new matching).
+
+```python
+matches = client.getMatchesForSampleId(sample_id)
+```
+
+<Note>
+This method retrieves previously calculated matches. To request new matches, use `requestMatchesForSample()`.
+</Note>
+
+**Example:**
+
+```python
+# First, request matches
+job_id = client.requestMatchesForSample(123)
+result = client.awaitResult(job_id)
+
+# Later, retrieve cached results
+cached_matches = client.getMatchesForSampleId(123)
+```
+
+## Awaiting Job Results
+
+### awaitResult()
+
+Wait for an asynchronous matching job to complete and retrieve results.
+
+```python
+client.awaitResult(job_id, sleep_time=2, compact=False)
+```
+
+<ParamField path="job_id" type="str" required>
+  The job ID returned by a matching request
+</ParamField>
+
+<ParamField path="sleep_time" type="int" default="2">
+  Seconds to wait between polling attempts
+</ParamField>
+
+<ParamField path="compact" type="bool" default="False">
+  Return compact result format (less detailed)
+</ParamField>
+
+<ResponseField name="return" type="dict">
+  The matching results, or None if job_id is None
+</ResponseField>
+
+**Example:**
+
+```python
+# Request matches
+job_id = client.requestMatchesForSample(123)
+
+# Wait for completion (polls every 2 seconds by default)
+try:
+    result = client.awaitResult(job_id)
+    print("Matching complete!")
+    print(f"Matches found: {len(result['matches'])}")
+except JobTerminatedError:
+    print("Job was terminated")
+
+# Use custom polling interval
+result = client.awaitResult(job_id, sleep_time=5)
+```
+
+## Matching Parameters
+
+The `_getMatchingRequestParams()` helper method constructs parameter dictionaries for matching requests:
+
+```python
+params = client._getMatchingRequestParams(
+    minhash_threshold=None,
+    pichash_size=None,
+    force_recalculation=None,
+    band_matches_required=None,
+    exclude_self_matches=False,
+    sample_group_only=False
+)
+```
+
+<ParamField path="minhash_threshold" type="float">
+  MinHash similarity threshold (0.0-1.0). Higher values = more similar code required.
+</ParamField>
+
+<ParamField path="pichash_size" type="int">
+  Size of PicHash for position-independent code matching
+</ParamField>
+
+<ParamField path="force_recalculation" type="bool">
+  Bypass cache and recalculate matches
+</ParamField>
+
+<ParamField path="band_matches_required" type="int">
+  Minimum LSH band matches needed
+</ParamField>
+
+<ParamField path="exclude_self_matches" type="bool" default="False">
+  Exclude matches to the same sample
+</ParamField>
+
+<ParamField path="sample_group_only" type="bool" default="False">
+  Only match within specified sample group
+</ParamField>
+
+## Complete Matching Workflow
+
+**Example: Full matching workflow with result analysis**
+
+```python
+from mcrit.client.McritClient import McritClient
+
+client = McritClient(mcrit_server="http://localhost:8000")
+
+# Step 1: Request matches
+print("Requesting matches...")
+job_id = client.requestMatchesForSample(
+    sample_id=123,
+    minhash_threshold=0.75,
+    pichash_size=16
+)
+
+print(f"Job ID: {job_id}")
+
+# Step 2: Wait for results
+print("Waiting for results...")
+try:
+    result = client.awaitResult(job_id, sleep_time=3)
+except JobTerminatedError:
+    print("Job was terminated unexpectedly")
+    exit(1)
+
+# Step 3: Analyze results
+print(f"\nMatching complete!")
+print(f"Total matches: {len(result['matches'])}")
+
+for match in result['matches']:
+    matched_sample_id = match['sample_id']
+    score = match['minhash_score']
+    
+    # Get sample details
+    sample = client.getSampleById(matched_sample_id)
+    
+    print(f"\nMatch: {sample.filename}")
+    print(f"  Sample ID: {matched_sample_id}")
+    print(f"  Similarity: {score:.2%}")
+    print(f"  Family: {sample.family}")
+    print(f"  Matched functions: {len(match['function_matches'])}")
+```

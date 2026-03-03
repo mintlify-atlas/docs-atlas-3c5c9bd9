@@ -1,0 +1,322 @@
+---
+title: Reference Data
+description: Import pre-built reference data for common compilers and libraries from mcrit-data
+---
+
+The [mcrit-data repository](https://github.com/danielplohmann/mcrit-data) provides ready-to-use reference data for common compilers and libraries, allowing you to quickly populate your MCRIT instance with known code signatures.
+
+## Overview
+
+Reference data helps MCRIT distinguish between:
+
+- **Malware-specific code**: Unique or modified code written by malware authors
+- **Compiler-generated code**: Standard runtime libraries and compiler artifacts
+- **Third-party libraries**: Common libraries like OpenSSL, zlib, etc.
+
+By importing reference data, you can:
+
+- Reduce false positives in matching
+- Quickly identify and label known library functions
+- Focus analysis on unique malware code
+- Speed up function labeling in IDA and other tools
+
+## Available Data
+
+The mcrit-data repository includes reference data for:
+
+### Compilers
+
+- Microsoft Visual C++ (multiple versions)
+- GCC (various versions and configurations)
+- MinGW
+- Clang/LLVM
+
+### Common Libraries
+
+- C Runtime Libraries (CRT)
+- Standard Template Library (STL)
+- OpenSSL
+- zlib
+- libcurl
+- Other frequently used libraries
+
+### Coverage
+
+Reference data covers:
+
+- Multiple compiler versions
+- Different optimization levels
+- Both 32-bit and 64-bit variants
+- Debug and release builds
+- Static and dynamic linking variants
+
+## Accessing Reference Data
+
+<Steps>
+  <Step title="Clone the Repository">
+    ```bash
+    git clone https://github.com/danielplohmann/mcrit-data.git
+    cd mcrit-data
+    ```
+  </Step>
+
+  <Step title="Browse Available Data">
+    The repository is organized by compiler and library:
+
+    ```bash
+    ls -la
+    # Example structure:
+    # msvc_2019_x64/
+    # msvc_2019_x86/
+    # gcc_11_x64/
+    # openssl_1.1.1/
+    ```
+  </Step>
+
+  <Step title="Select Data to Import">
+    Choose the reference data relevant to your analysis targets.
+  </Step>
+</Steps>
+
+## Import Process
+
+Import reference data into your MCRIT instance using the CLI or Python client:
+
+### Using the CLI
+
+<CodeGroup>
+```bash Import Single File
+mcrit client import mcrit-data/msvc_2019_x64.mcrit
+```
+
+```bash Import Multiple Files
+for file in mcrit-data/*.mcrit; do
+    mcrit client import "$file"
+done
+```
+</CodeGroup>
+
+### Using Python Client
+
+```python
+from mcrit.client.McritClient import McritClient
+import json
+import glob
+
+client = McritClient()
+
+# Import all reference data files
+for filepath in glob.glob("mcrit-data/*.mcrit"):
+    print(f"Importing {filepath}...")
+    
+    with open(filepath, "r") as f:
+        import_data = json.load(f)
+    
+    result = client.addImportData(import_data)
+    print(f"  Imported: {result['num_samples_imported']} samples")
+    print(f"  Functions: {result['num_functions_imported']} functions")
+```
+
+### Verify Import
+
+Check that reference data was imported successfully:
+
+```bash
+mcrit client status
+```
+
+You should see increased counts for:
+- `num_samples`: Reference samples added
+- `num_functions`: Library functions indexed
+- `num_families`: Compiler/library families created
+
+## Using Reference Data
+
+### Filtering Matches
+
+When querying samples, reference data helps identify library code:
+
+```python
+from mcrit.client.McritClient import McritClient
+
+client = McritClient()
+
+# Query sample
+job_id = client.requestMatchesForSample(sample_id=123)
+result = client.awaitResult(job_id)
+
+# Identify library matches
+for match in result['matches']:
+    if match['family'].startswith('msvc_') or match['family'].startswith('gcc_'):
+        print(f"Library function: {match['function_name']}")
+    else:
+        print(f"Potentially malicious: {match['function_name']}")
+```
+
+### Label Import in IDA
+
+With reference data loaded:
+
+1. Query functions in IDA plugin
+2. Matches to library code appear with labels
+3. Batch import library function names
+4. Focus manual analysis on non-library code
+
+### Family-Based Analysis
+
+Mark reference data as libraries to exclude from certain analyses:
+
+```python
+from mcrit.client.McritClient import McritClient
+
+client = McritClient()
+
+# Mark compiler families as libraries
+for family_id in [1, 2, 3]:  # MSVC, GCC, etc.
+    client.modifyFamily(family_id, is_library=True)
+```
+
+## Data Organization
+
+Reference data in mcrit-data follows consistent naming:
+
+```
+<compiler>_<version>_<architecture>.mcrit
+```
+
+Examples:
+- `msvc_2019_x64.mcrit` - Visual Studio 2019, 64-bit
+- `gcc_11_x86.mcrit` - GCC 11, 32-bit
+- `mingw_10_x64.mcrit` - MinGW 10, 64-bit
+
+Libraries include version information:
+- `openssl_1.1.1k_x64.mcrit`
+- `zlib_1.2.11_x86.mcrit`
+
+## Creating Custom Reference Data
+
+You can contribute your own reference data:
+
+<Steps>
+  <Step title="Collect Clean Samples">
+    Gather clean compiler libraries or third-party libraries you want to add.
+  </Step>
+
+  <Step title="Submit to MCRIT">
+    ```bash
+    mcrit client submit --mode dir ~/compiler_libs/ -l -f "msvc_2022" -v "17.0"
+    ```
+
+    Note the `-l` flag to mark as library code.
+  </Step>
+
+  <Step title="Export Reference Data">
+    ```bash
+    mcrit client export --sample_ids 100,101,102,103 msvc_2022_x64.mcrit
+    ```
+  </Step>
+
+  <Step title="Share with Community">
+    Submit pull request to mcrit-data repository to share with other users.
+  </Step>
+</Steps>
+
+## Best Practices
+
+### Initial Setup
+
+1. **Import core compilers first**: Start with MSVC and GCC for Windows/Linux analysis
+2. **Match your targets**: Import reference data for compilers used by your malware samples
+3. **Version selection**: Import multiple versions if analyzing diverse samples
+
+### Maintenance
+
+- **Update regularly**: Check mcrit-data for new compiler versions
+- **Clean duplicates**: Use `is_library` flag to manage reference vs. malware samples
+- **Export subsets**: Create domain-specific reference collections
+
+### Performance
+
+- **Import selectively**: Don't import all data if you only analyze Windows malware
+- **Monitor database size**: Reference data increases database size and query time
+- **Use sample groups**: Organize reference data into logical family groups
+
+## Example Workflow
+
+<Steps>
+  <Step title="Fresh MCRIT Instance">
+    ```bash
+    # Start with empty database
+    mcrit client status
+    ```
+  </Step>
+
+  <Step title="Import Core References">
+    ```bash
+    # Import Windows compiler libraries
+    mcrit client import mcrit-data/msvc_2019_x64.mcrit
+    mcrit client import mcrit-data/msvc_2019_x86.mcrit
+    
+    # Import common libraries
+    mcrit client import mcrit-data/openssl_1.1.1.mcrit
+    ```
+  </Step>
+
+  <Step title="Verify Data">
+    ```bash
+    mcrit client status
+    # Check num_samples and num_functions increased
+    
+    mcrit client search "CRT"
+    # Verify compiler runtime functions are searchable
+    ```
+  </Step>
+
+  <Step title="Analyze Malware">
+    ```bash
+    mcrit client submit unknown_malware.exe -f unknown
+    mcrit client search unknown
+    
+    # Matches to MSVC libraries help identify compiler
+    # Unique functions indicate malware-specific code
+    ```
+  </Step>
+</Steps>
+
+## Repository Structure
+
+The mcrit-data repository includes:
+
+```
+mcrit-data/
+├── README.md              # Documentation
+├── compilers/             # Compiler runtime libraries
+│   ├── msvc/
+│   ├── gcc/
+│   └── mingw/
+├── libraries/             # Third-party libraries
+│   ├── openssl/
+│   ├── zlib/
+│   └── crypto/
+└── metadata.json          # Version and build information
+```
+
+## Contributing
+
+To contribute reference data:
+
+1. Follow naming conventions
+2. Include metadata (compiler version, optimization, architecture)
+3. Verify data quality (clean builds, no malware)
+4. Submit PR with documentation
+5. Include export details for reproducibility
+
+<Note>
+  Reference data files can be large. The repository may use Git LFS for efficient storage.
+</Note>
+
+## Resources
+
+- **Repository**: [github.com/danielplohmann/mcrit-data](https://github.com/danielplohmann/mcrit-data)
+- **Issues**: Report problems or request new reference data
+- **Discussions**: Share custom reference collections

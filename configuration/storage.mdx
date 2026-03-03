@@ -1,0 +1,174 @@
+---
+title: "Storage Configuration"
+description: "Configure MongoDB connection and storage behavior"
+---
+
+## Overview
+
+MCRIT uses MongoDB as its primary storage backend. The `StorageConfig` class controls database connections, banding strategy, caching, and cleanup policies.
+
+## Storage Method
+
+<ParamField path="STORAGE_METHOD" type="StorageFactory constant" default="StorageFactory.STORAGE_METHOD_MONGODB">
+  Storage backend to use. MCRIT supports:
+  - `StorageFactory.STORAGE_METHOD_MONGODB` - MongoDB storage (default, recommended)
+  - `StorageFactory.STORAGE_METHOD_MEMORY` - In-memory storage (for testing only)
+</ParamField>
+
+## MongoDB Connection
+
+<ParamField path="STORAGE_SERVER" type="string" default='127.0.0.1'>
+  MongoDB server hostname or IP address.
+</ParamField>
+
+<ParamField path="STORAGE_PORT" type="string" default='27017'>
+  MongoDB server port number.
+</ParamField>
+
+<ParamField path="STORAGE_MONGODB_DBNAME" type="string" default='mcrit'>
+  Name of the MongoDB database to use for storage.
+  
+  <Warning>
+  Changing this database name does not automatically change the queue database name (`QUEUE_MONGODB_DBNAME`). They must be updated independently.
+  </Warning>
+</ParamField>
+
+<ParamField path="STORAGE_MONGODB_USERNAME" type="string" default="None">
+  MongoDB authentication username. Set to `None` if authentication is not required.
+</ParamField>
+
+<ParamField path="STORAGE_MONGODB_PASSWORD" type="string" default="None">
+  MongoDB authentication password. Set to `None` if authentication is not required.
+</ParamField>
+
+<ParamField path="STORAGE_MONGODB_FLAGS" type="string" default=''>
+  Additional MongoDB connection string flags (e.g., `"authSource=admin&ssl=true"`).
+</ParamField>
+
+## Storage Cleanup
+
+<ParamField path="STORAGE_MONGODB_ENABLE_CLEANUP" type="bool" default="False">
+  Enable automatic periodic deletion of queried samples and their results after a specified time period.
+</ParamField>
+
+<ParamField path="STORAGE_MONGODB_CLEANUP_DELTA" type="int" default="604800">
+  Time delta in seconds for cleanup operations. Default: `60 * 60 * 24 * 7` (7 days).
+  
+  Defines how old samples must be before they are eligible for cleanup.
+</ParamField>
+
+<ParamField path="STORAGE_MONGODB_CLEANUP_TTL" type="int" default="604800">
+  Time-to-live in seconds for cleaned up entries. Default: `60 * 60 * 24 * 7` (7 days).
+</ParamField>
+
+## Storage Optimization
+
+<ParamField path="STORAGE_DROP_DISASSEMBLY" type="bool" default="False">
+  Once MinHashes have been calculated, discard disassembly data from function entries to save storage space.
+  
+  <Warning>
+  Enabling this option permanently removes disassembly information and cannot be undone without re-importing samples.
+  </Warning>
+</ParamField>
+
+## Banding Configuration
+
+MCRIT uses banding to optimize MinHash matching performance by dividing hash signatures into bands.
+
+<ParamField path="STORAGE_BAND_STRATEGY" type="string" default='random'>
+  Strategy for selecting MinHash fields to include in bands:
+  - `"random"` - Randomly sample from MinHash fields (more fuzzy, may not use all fields)
+  - `"linear"` - Sequential selection of MinHash fields (requires `size × number = MINHASH_SIGNATURE_LENGTH`)
+</ParamField>
+
+<ParamField path="STORAGE_BAND_SEED" type="int" default="0xDEADBEEF">
+  Random seed for deriving band sequences. Ensures reproducible banding configuration.
+</ParamField>
+
+<ParamField path="STORAGE_BANDS" type="dict[int, int]" default="{4: 20}">
+  Dictionary defining band configuration with structure `{size: number}`.
+  
+  - **Key (size)**: Number of hash values per band
+  - **Value (number)**: Number of bands of this size
+  
+  Both MemoryStorage and MongoDbStorage support:
+  - Arbitrary banding configurations
+  - Multiple band sizes simultaneously
+  - Mixed sizes for increased scatter and randomness
+  
+  Example: `{4: 20, 8: 10}` creates 20 bands of size 4 and 10 bands of size 8.
+</ParamField>
+
+<ParamField path="STORAGE_NUM_BANDS" type="property" readonly>
+  Computed property that returns the total number of bands by summing all values in `STORAGE_BANDS`.
+  
+  For default `{4: 20}`, this returns `20`.
+</ParamField>
+
+## Caching
+
+<ParamField path="STORAGE_CACHE" type="bool" default="False">
+  Enable in-memory hashmap cache for all banding data.
+  
+  <Note>
+  Provides significant performance improvements but is very memory-intensive. Use with caution on systems with limited RAM.
+  </Note>
+</ParamField>
+
+## Export Limits
+
+<ParamField path="STORAGE_MAX_EXPORT_SIZE" type="int" default="1073741824">
+  Maximum export size in bytes to protect against out-of-memory errors. Default: `1024 * 1024 * 1024` (1 GB).
+</ParamField>
+
+## Connection String Format
+
+MongoDB connection strings are constructed as:
+
+```
+mongodb://[username:password@]server[:port]/database[?flags]
+```
+
+Example configurations:
+
+### Local MongoDB (No Authentication)
+```python
+from mcrit.config.StorageConfig import StorageConfig
+
+storage_config = StorageConfig(
+    STORAGE_SERVER="127.0.0.1",
+    STORAGE_PORT="27017",
+    STORAGE_MONGODB_DBNAME="mcrit"
+)
+```
+
+### Remote MongoDB with Authentication
+```python
+storage_config = StorageConfig(
+    STORAGE_SERVER="mongodb.example.com",
+    STORAGE_PORT="27017",
+    STORAGE_MONGODB_DBNAME="mcrit_prod",
+    STORAGE_MONGODB_USERNAME="mcrit_user",
+    STORAGE_MONGODB_PASSWORD="secure_password",
+    STORAGE_MONGODB_FLAGS="authSource=admin"
+)
+```
+
+### Optimized Configuration
+```python
+storage_config = StorageConfig(
+    STORAGE_SERVER="127.0.0.1",
+    STORAGE_MONGODB_DBNAME="mcrit",
+    STORAGE_DROP_DISASSEMBLY=True,
+    STORAGE_BANDS={4: 25, 8: 10},
+    STORAGE_CACHE=True,
+    STORAGE_MONGODB_ENABLE_CLEANUP=True,
+    STORAGE_MONGODB_CLEANUP_DELTA=60*60*24*14  # 14 days
+)
+```
+
+## Related Configuration
+
+- [Server Configuration](/configuration/server) - Server and authentication settings
+- [MinHash Configuration](/configuration/minhash) - MinHash algorithm parameters
+- [Queue Configuration](/configuration/queue) - Job queue settings

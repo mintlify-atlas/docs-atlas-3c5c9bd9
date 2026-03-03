@@ -1,0 +1,333 @@
+---
+title: 'Export & Import Methods'
+description: 'Methods for exporting and importing MCRIT data'
+---
+
+## Overview
+
+Export and import methods allow you to transfer MCRIT data between instances or create backups of your analysis database. This is useful for sharing datasets, creating offline archives, or migrating to different MCRIT servers.
+
+## Export Data
+
+### exportData()
+
+Export MCRIT data for samples (alias for `getExportData`).
+
+```python
+client.exportData(sample_ids=None, compress_data=True) -> dict
+```
+
+<ParamField path="sample_ids" type="List[int]">
+  List of sample IDs to export. If None, exports all data.
+</ParamField>
+
+<ParamField path="compress_data" type="bool" default="True">
+  Whether to compress the exported data
+</ParamField>
+
+<ResponseField name="return" type="dict">
+  Dictionary containing exported data
+</ResponseField>
+
+**Example:**
+
+```python
+from mcrit.client.McritClient import McritClient
+import json
+
+client = McritClient(mcrit_server="http://localhost:8000")
+
+# Export all data
+all_data = client.exportData()
+
+# Save to file
+with open("mcrit_export_all.json", "w") as f:
+    json.dump(all_data, f)
+
+print(f"Exported {len(all_data)} samples")
+```
+
+### getExportData()
+
+Get export data for specific samples or all samples.
+
+```python
+client.getExportData(sample_ids=None, compress_data=True) -> dict
+```
+
+This is the underlying method called by `exportData()`.
+
+<ParamField path="sample_ids" type="List[int]">
+  List of sample IDs to export. Must be a list of integers, or None for all samples.
+</ParamField>
+
+<ParamField path="compress_data" type="bool" default="True">
+  Compress the data for smaller file size
+</ParamField>
+
+**Example:**
+
+```python
+import json
+
+# Export specific samples
+sample_ids = [100, 101, 102, 103, 104]
+export_data = client.getExportData(
+    sample_ids=sample_ids,
+    compress_data=True
+)
+
+# Save to file
+with open("mcrit_export_subset.json", "w") as f:
+    json.dump(export_data, f, indent=2)
+
+print(f"Exported {len(export_data['samples'])} samples")
+```
+
+**Export data structure:**
+
+The exported data dictionary contains:
+
+```python
+{
+    "version": "1.0",
+    "samples": {
+        "sample_id": {
+            "sample_id": 123,
+            "sha256": "a1b2c3...",
+            "filename": "malware.exe",
+            "family": "emotet",
+            "version": "2023-01",
+            # ... other sample metadata
+        },
+        # ... more samples
+    },
+    "functions": {
+        "function_id": {
+            "function_id": 45678,
+            "sample_id": 123,
+            "offset": 0x1000,
+            "minhash": [...],
+            "pichash": 0x1234567890abcdef,
+            # ... other function data
+        },
+        # ... more functions
+    },
+    "families": {
+        "family_id": {
+            "family_id": 5,
+            "family_name": "emotet",
+            "is_library": false
+        },
+        # ... more families
+    }
+}
+```
+
+## Import Data
+
+### importData()
+
+Import MCRIT data from an export file (alias for `addImportData`).
+
+```python
+client.importData(import_data)
+```
+
+<ParamField path="import_data" type="dict" required>
+  Dictionary containing exported MCRIT data
+</ParamField>
+
+**Example:**
+
+```python
+import json
+
+# Load exported data
+with open("mcrit_export.json", "r") as f:
+    import_data = json.load(f)
+
+# Import into MCRIT
+result = client.importData(import_data)
+
+if result:
+    print(f"Successfully imported {len(import_data['samples'])} samples")
+    print(f"Imported {len(import_data['functions'])} functions")
+    print(f"Imported {len(import_data['families'])} families")
+```
+
+### addImportData()
+
+Add import data to MCRIT.
+
+```python
+client.addImportData(import_data)
+```
+
+This is the underlying method called by `importData()`.
+
+<ParamField path="import_data" type="dict" required>
+  Must be a dictionary with export data. Raises ValueError if not a dict.
+</ParamField>
+
+**Example:**
+
+```python
+import json
+
+with open("export.json", "r") as f:
+    data = json.load(f)
+
+result = client.addImportData(data)
+print(f"Import result: {result}")
+```
+
+## Complete Export/Import Workflow
+
+**Example: Backup and restore workflow**
+
+```python
+from mcrit.client.McritClient import McritClient
+import json
+import datetime
+
+# Connect to source server
+source_client = McritClient(mcrit_server="http://source:8000")
+
+# Step 1: Export data
+print("Exporting data from source server...")
+export_data = source_client.getExportData(compress_data=True)
+
+# Step 2: Save to backup file
+timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+backup_file = f"mcrit_backup_{timestamp}.json"
+
+with open(backup_file, "w") as f:
+    json.dump(export_data, f)
+
+print(f"Saved backup to {backup_file}")
+print(f"  Samples: {len(export_data['samples'])}")
+print(f"  Functions: {len(export_data['functions'])}")
+print(f"  Families: {len(export_data['families'])}")
+
+# Step 3: Import to destination server
+print("\nImporting to destination server...")
+dest_client = McritClient(mcrit_server="http://destination:8000")
+
+with open(backup_file, "r") as f:
+    import_data = json.load(f)
+
+result = dest_client.addImportData(import_data)
+
+if result:
+    print("Import successful!")
+else:
+    print("Import failed")
+```
+
+**Example: Export specific family**
+
+```python
+# Get all samples from a specific family
+family_id = 5
+family = client.getFamily(family_id, with_samples=True)
+
+if family:
+    # Extract sample IDs
+    sample_ids = [sample.sample_id for sample in family.samples]
+    
+    print(f"Exporting family '{family.family_name}' ({len(sample_ids)} samples)...")
+    
+    # Export only these samples
+    export_data = client.getExportData(
+        sample_ids=sample_ids,
+        compress_data=True
+    )
+    
+    # Save to file
+    filename = f"export_{family.family_name}.json"
+    with open(filename, "w") as f:
+        json.dump(export_data, f, indent=2)
+    
+    print(f"Saved to {filename}")
+```
+
+**Example: Selective import with validation**
+
+```python
+import json
+
+# Load export file
+with open("export.json", "r") as f:
+    data = json.load(f)
+
+print("Validating import data...")
+
+# Validate structure
+if not isinstance(data, dict):
+    print("ERROR: Import data must be a dictionary")
+    exit(1)
+
+required_keys = ['samples', 'functions', 'families']
+for key in required_keys:
+    if key not in data:
+        print(f"ERROR: Missing required key: {key}")
+        exit(1)
+
+print(f"Data contains:")
+print(f"  Samples: {len(data['samples'])}")
+print(f"  Functions: {len(data['functions'])}")
+print(f"  Families: {len(data['families'])}")
+
+# Check for conflicts
+print("\nChecking for conflicts...")
+conflicts = []
+
+for sample_id, sample_data in data['samples'].items():
+    sha256 = sample_data['sha256']
+    existing = client.getSampleBySha256(sha256)
+    if existing:
+        conflicts.append(f"Sample SHA256 {sha256} already exists (ID: {existing.sample_id})")
+
+if conflicts:
+    print(f"WARNING: Found {len(conflicts)} potential conflicts:")
+    for conflict in conflicts[:5]:  # Show first 5
+        print(f"  - {conflict}")
+    
+    response = input("Continue with import? (y/n): ")
+    if response.lower() != 'y':
+        print("Import cancelled")
+        exit(0)
+
+# Proceed with import
+print("\nImporting data...")
+result = client.addImportData(data)
+
+if result:
+    print("Import completed successfully!")
+else:
+    print("Import failed")
+```
+
+## Export Format Notes
+
+<Note>
+Exported data includes:
+- Sample metadata (SHA256, filename, family, etc.)
+- Function information (MinHash, PicHash, CFG, etc.)
+- Family definitions
+- All relationships between samples, functions, and families
+</Note>
+
+<Warning>
+Importing data does not overwrite existing samples. If a sample with the same SHA256 already exists, the import may skip it or create a duplicate depending on server configuration.
+</Warning>
+
+## Use Cases
+
+1. **Backup and Disaster Recovery**: Regular exports for backup purposes
+2. **Data Migration**: Move data between MCRIT instances
+3. **Sharing Datasets**: Share malware analysis datasets with other researchers
+4. **Offline Analysis**: Export data for offline processing
+5. **Selective Replication**: Export specific families or sample sets
+6. **Development/Testing**: Create test datasets from production data
